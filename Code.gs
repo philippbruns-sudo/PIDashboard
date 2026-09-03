@@ -68,10 +68,11 @@ function aggregatePeriod(startObj, endObj, sheets, monthNames) {
              if (!stats.staff[staff]) stats.staff[staff] = { count: 0, revenue: 0 };
              stats.staff[staff].count += val;
              stats.staff[staff].revenue += netto;
-             
-             if (!stats.locs[locationName]) stats.locs[locationName] = { count: 0, revenue: 0 };
+
+             if (!stats.locs[locationName]) stats.locs[locationName] = { count: 0, revenue: 0, staffSet: {} };
              stats.locs[locationName].count += val;
              stats.locs[locationName].revenue += netto;
+             stats.locs[locationName].staffSet[staff] = true;
           }
         }
       }
@@ -97,7 +98,7 @@ function getReportData(startDateStr, endDateStr) {
     var statsP1 = aggregatePeriod(startP1, endP1, sheets, monthNames);
     var statsP2 = aggregatePeriod(startP2, endP2, sheets, monthNames);
 
-    var locArray = Object.keys(statsP1.locs).map(function(k) { return {name: k, count: statsP1.locs[k].count, revenue: statsP1.locs[k].revenue}; });
+    var locArray = Object.keys(statsP1.locs).map(function(k) { return {name: k, count: statsP1.locs[k].count, revenue: statsP1.locs[k].revenue, staff: Object.keys(statsP1.locs[k].staffSet).join(", ")}; });
     locArray.sort(function(a, b) { return b.count - a.count; });
     
     var staffArray = Object.keys(statsP1.staff).map(function(k) { return {name: k, count: statsP1.staff[k].count, revenue: statsP1.staff[k].revenue}; });
@@ -174,7 +175,7 @@ function getDashboardStats(startDateStr, endDateStr, baseDateStr) {
     
     var stats = aggregatePeriod(startObj, endObj, sheets, monthNames);
     
-    var locationArray = Object.keys(stats.locs).map(function(key) { return {name: key, count: stats.locs[key].count, revenue: stats.locs[key].revenue}; });
+    var locationArray = Object.keys(stats.locs).map(function(key) { return {name: key, count: stats.locs[key].count, revenue: stats.locs[key].revenue, staff: Object.keys(stats.locs[key].staffSet).join(", ")}; });
     locationArray.sort(function(a, b) { return b.count - a.count; });
     
     var staffArray = Object.keys(stats.staff).map(function(key) { return {name: key, count: stats.staff[key].count, revenue: stats.staff[key].revenue}; });
