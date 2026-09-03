@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://bossanova.uk/jspreadsheet/v4/jexcel.js"></script>
+  <link rel="stylesheet" href="https://bossanova.uk/jspreadsheet/v4/jexcel.css" type="text/css" />
+  <script src="https://jsuites.net/v4/jsuites.js"></script>
+  <link rel="stylesheet" href="https://jsuites.net/v4/jsuites.css" type="text/css" />
+  
+  <style>
+    :root {
+      --primary: #003366;       
+      --primary-hover: #002244; 
+      --secondary: #00a651;     
+      --bg: #f3f4f6;
+      --card-bg: #ffffff;
+      --text: #1f2937;
+      --border: #e5e7eb;
+    }
+    
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+      background-color: var(--bg); 
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+      box-sizing: border-box;
+    }
+    
+    .card {
+      background-color: var(--card-bg);
+      flex: 1;
+      width: 100%;
+      padding: 2rem 5%;
+      border-radius: 0;
+      box-shadow: none;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+    
+    .header-container {
+      display: flex; 
+      align-items: center; 
+      gap: 15px; 
+      margin-bottom: 2rem;
+    }
+    
+    .header-container img { height: 90px; object-fit: contain; }
+    h2 { margin: 0; font-size: 2.2rem; color: #111827; }
+    p { color: #6b7280; margin-bottom: 1.5rem; line-height: 1.5; font-size: 1.05rem;}
+    
+    /* TABS */
+    .tabs {
+      display: flex; border-bottom: 1px solid var(--border); margin-bottom: 2rem; gap: 0; flex-wrap: wrap;
+    }
+    .tab {
+      padding: 14px 28px; cursor: pointer; font-weight: 600; font-size: 1.1rem; color: #4b5563;
+      background-color: #f3f4f6; border: 1px solid var(--border); border-bottom: none;
+      border-radius: 8px 8px 0 0; margin-right: 4px; margin-bottom: -1px; transition: all 0.2s ease-in-out;
+    }
+    .tab:hover { color: var(--primary); background-color: #e5e7eb; }
+    .tab.active {
+      color: var(--primary); background-color: var(--card-bg); border-top: 3px solid var(--primary);
+      border-bottom: 1px solid var(--card-bg); z-index: 1;
+    }
+    
+    .tab-content { display: none; width: 100%; margin: 0; }
+    .tab-content.active { display: block; }
+    
+    /* FORMULAR & BUTTONS */
+    .form-group { margin-bottom: 1.5rem; }
+    label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 1rem; }
+    
+    input[type="date"], input[type="text"] {
+      height: 46px; width: 100%; padding: 0 1rem; border: 1px solid var(--border); 
+      border-radius: 8px; font-size: 1rem; box-sizing: border-box; font-family: inherit; outline: none;
+    }
+    input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1); }
+    
+    .filter-btn { height: 46px; padding: 0 1.5rem; font-size: 1.05rem; margin: 0; display: flex; align-items: center; justify-content: center; box-sizing: border-box; white-space: nowrap; }
+
+    button { 
+      background-color: var(--primary); color: white; border: none; padding: 1rem 1.5rem; 
+      border-radius: 8px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; 
+    }
+    button:hover { background-color: var(--primary-hover); }
+    button:disabled { background-color: #9ca3af; cursor: not-allowed; }
+    .btn-secondary { background-color: #6b7280; }
+    .btn-secondary:hover { background-color: #4b5563; }
+    .btn-success { background-color: var(--secondary); }
+    .btn-success:hover { background-color: #008f45; }
+    .btn-edit { background-color: #3b82f6; padding: 6px 12px; font-size: 0.9rem; }
+    .btn-edit:hover { background-color: #2563eb; }
+    .btn-edit-alert { background-color: #f59e0b; padding: 6px 12px; font-size: 0.95rem; color: white; font-weight: bold;}
+    .btn-edit-alert:hover { background-color: #d97706; }
+    .btn-delete { background-color: #ef4444; padding: 6px 12px; font-size: 0.9rem; margin-left: 4px; }
+    .btn-delete:hover { background-color: #dc2626; }
+    
+    .quick-filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: -1rem; margin-bottom: 2.5rem; }
+    .btn-chip { background-color: #f3f4f6; color: #4b5563; border: 1px solid var(--border); padding: 0.5rem 1rem; font-size: 0.9rem; border-radius: 999px; font-weight: 500; cursor: pointer; transition: all 0.2s; height: auto; }
+    .btn-chip:hover { background-color: #e5e7eb; color: #111827; border-color: #d1d5db; }
+
+    .message-box { margin-top: 1.5rem; padding: 1rem; border-radius: 8px; display: none; text-align: center; font-weight: 500; font-size: 1.1rem;}
+    .success { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+    .error { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    
+    /* DATEN-RASTER STANDORTE */
+    .grid-preview { border: 1px solid var(--border); border-radius: 8px; min-height: 200px; overflow-y: auto; background: #fafafa; }
+    .grid-locations { max-height: 60vh; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+    .data-table th, .data-table td { border: 1px solid var(--border); padding: 10px 12px; text-align: left; }
+    .data-table th { background-color: #e5e7eb; position: sticky; top: 0; color: #374151; font-weight: 700; user-select: none; }
+    .data-table th.sortable:hover { background-color: #d1d5db; }
+    .data-table tr:nth-child(even) { background-color: #f9fafb; }
+    .data-table tr:hover { background-color: #f3f4f6; }
+    
+    /* DASHBOARD */
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end; background: #f8fafc; padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; border: 1px solid var(--border); }
+    .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+    .chart-container { background: #ffffff; border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); display: flex; flex-direction: column; }
+    .chart-wrapper { position: relative; width: 100%; transition: height 0.3s; }
+    .chart-title { text-align: center; font-weight: 700; font-size: 1.2rem; margin-bottom: 1.5rem; color: #374151;}
+    
+    /* SPREADSHEET EINGABE */
+    .spreadsheet-container { margin-bottom: 1.5rem; }
+    .jexcel_container { border: 1px solid var(--border); border-radius: 8px; max-width: 100%; overflow-x: auto;}
+    
+    /* BERICHT PREVIEW */
+    .report-preview-container { background: #e5e7eb; padding: 2rem; display: flex; justify-content: center; border-radius: 8px; border: 1px solid var(--border); }
+    .report-page { width: 210mm; min-height: 297mm; background: white; padding: 15mm; box-shadow: 0 10px 25px rgba(0,0,0,0.1); box-sizing: border-box; font-family: Arial, sans-serif; color: #1f2937; }
+    .rep-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid var(--primary); padding-bottom: 15px; margin-bottom: 20px;}
+    .rep-header img { height: 50px; }
+    .rep-title { text-align: right; }
+    .rep-title h1 { margin: 0; color: var(--primary); font-size: 24pt; }
+    .rep-title p { margin: 5px 0 0 0; font-size: 12pt; color: #6b7280; }
+    .rep-kpi-row { display: flex; gap: 15px; margin-bottom: 30px; }
+    .rep-kpi-card { flex: 1; background: #f8fafc; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; text-align: center; }
+    .rep-kpi-val { font-size: 24pt; font-weight: bold; color: var(--primary); margin: 5px 0; }
+    .rep-kpi-label { font-size: 10pt; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; }
+    .rep-kpi-trend { font-size: 11pt; font-weight: bold; margin-top: 5px; }
+    .trend-pos { color: #10b981; } .trend-neg { color: #ef4444; }
+    .rep-charts-row { display: flex; gap: 20px; margin-bottom: 30px; }
+    .rep-chart-box { flex: 1; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; }
+    .rep-table-box h3 { margin-top: 0; color: var(--primary); }
+    .rep-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+    .rep-table th, .rep-table td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+    .rep-table th { background: #f3f4f6; color: #374151; }
+    
+    @media (max-width: 900px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .filter-bar { flex-direction: column; align-items: stretch; }
+      .rep-kpi-row { flex-wrap: wrap; }
+      .rep-charts-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <div class="header-container">
+       <img src="https://parkinnovation.de/wp-content/uploads/2023/11/PI-Logo_220.png" alt="Parkinnovation Logo">
+       <h2>PCN-Dashboard</h2>
+    </div>
+    
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('dashboard')">Dashboard</div>
+      <div class="tab" onclick="switchTab('bericht')">📄 Bericht (PDF)</div>
+      <div class="tab" onclick="switchTab('eingabe')">Dateneingabe</div>
+      <div class="tab" onclick="switchTab('standorte')">Standorte</div>
+    </div>
+    
+    <!-- DASHBOARD TAB -->
+    <div id="dashboard-tab" class="tab-content active">
+      <p>Nutze die Schnellfilter oder wähle ein benutzerdefiniertes Datum, um Statistiken über alle Monate hinweg auszuwerten.</p>
+      <div class="filter-bar">
+        <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 180px;">
+          <label>Von Datum:</label>
+          <input type="date" id="dashStart">
+        </div>
+        <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 180px;">
+          <label>Bis Datum:</label>
+          <input type="date" id="dashEnd">
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+          <button onclick="loadDashboard()" class="btn-success filter-btn">🔄 Filtern</button>
+          <button onclick="resetDashboardFilter()" class="btn-secondary filter-btn">✖ Reset</button>
+        </div>
+      </div>
+      <div class="quick-filters">
+         <button onclick="setDashFilter('thisWeek')" class="btn-chip">Diese Woche</button>
+         <button onclick="setDashFilter('lastWeek')" class="btn-chip">Letzte Woche</button>
+         <button onclick="setDashFilter('thisMonth')" class="btn-chip">Dieser Monat</button>
+         <button onclick="setDashFilter('lastMonth')" class="btn-chip">Letzter Monat</button>
+         <button onclick="setDashFilter('thisYear')" class="btn-chip">Dieses Jahr</button>
+      </div>
+      
+      <div class="rep-kpi-row" style="margin-top: 1rem;">
+         <div class="rep-kpi-card">
+            <div class="rep-kpi-label">Tickets Periode</div>
+            <div class="rep-kpi-val" id="dashKpiTotal">0</div>
+         </div>
+         <div class="rep-kpi-card">
+            <div class="rep-kpi-label">Netto-Umsatz</div>
+            <div class="rep-kpi-val" id="dashKpiRevenue" style="color: #00a651;">0,00 €</div>
+         </div>
+      </div>
+      
+      <div id="loadingDash" style="display:none; text-align:center; margin-bottom: 2rem; font-size: 1.2rem;">⏳ Lade Statistiken aus Google Sheets...</div>
+      <div class="dashboard-grid">
+        <div class="chart-container">
+          <div class="chart-title">Mitarbeiter Ranking</div>
+          <div class="chart-wrapper" id="staffChartWrapper">
+            <canvas id="staffChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-container">
+          <div class="chart-title">Alle Parkplätze Ranking</div>
+          <div class="chart-wrapper" id="locChartWrapper">
+             <canvas id="locationChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- BERICHT TAB -->
+    <div id="bericht-tab" class="tab-content">
+      <p>Erstelle einen formatierten PDF-Bericht inkl. Vergleich zur exakten Vorperiode (z.B. Vorwoche, Vormonat).</p>
+      
+      <div class="filter-bar" style="background: #e0e7ff; border-color: #c7d2fe;">
+        <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 180px;">
+          <label>Bericht Start:</label>
+          <input type="date" id="repStart">
+        </div>
+        <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 180px;">
+          <label>Bericht Ende:</label>
+          <input type="date" id="repEnd">
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+          <button onclick="loadReport()" class="btn-success filter-btn">👁️ Vorschau laden</button>
+          <button onclick="downloadPDF()" id="pdfBtn" class="filter-btn" style="background: var(--primary); color: white;" disabled>💾 PDF Speichern</button>
+        </div>
+      </div>
+      <div class="quick-filters">
+         <button onclick="setRepFilter('thisWeek')" class="btn-chip">Diese Woche</button>
+         <button onclick="setRepFilter('lastWeek')" class="btn-chip">Letzte Woche</button>
+         <button onclick="setRepFilter('thisMonth')" class="btn-chip">Dieser Monat</button>
+         <button onclick="setRepFilter('lastMonth')" class="btn-chip">Letzter Monat</button>
+         <button onclick="setRepFilter('thisYear')" class="btn-chip">Dieses Jahr</button>
+      </div>
+      
+      <div id="loadingRep" style="display:none; text-align:center; margin-bottom: 2rem; font-size: 1.2rem;">⏳ Analysiere Daten und vergleiche mit Vorperiode...</div>
+      
+      <div class="report-preview-container" id="reportWrapper" style="display:none;">
+         <div class="report-page" id="reportPage">
+            <div class="rep-header">
+               <img src="https://parkinnovation.de/wp-content/uploads/2023/11/PI-Logo_220.png" alt="Logo">
+               <div class="rep-title">
+                  <h1>Performance Bericht</h1>
+                  <p id="repDateLabel">Datum - Datum</p>
+                  <p style="font-size: 9pt; margin-top:3px;">(Vergleich zu: <span id="repPrevDateLabel"></span>)</p>
+               </div>
+            </div>
+            
+            <div class="rep-kpi-row" style="flex-wrap: wrap;">
+               <div class="rep-kpi-card" style="flex: 1 1 30%;">
+                  <div class="rep-kpi-label">Tickets Gesamt</div>
+                  <div class="rep-kpi-val" id="repKpiTotal">0</div>
+                  <div class="rep-kpi-trend" id="repKpiTrend">+/- 0%</div>
+               </div>
+               <div class="rep-kpi-card" style="flex: 1 1 30%;">
+                  <div class="rep-kpi-label">Netto-Umsatz</div>
+                  <div class="rep-kpi-val" id="repKpiRevenue" style="color: #00a651;">0,00 €</div>
+                  <div class="rep-kpi-trend" id="repKpiRevTrend">+/- 0%</div>
+               </div>
+               <div class="rep-kpi-card" style="flex: 1 1 30%;">
+                  <div class="rep-kpi-label">Tickets Vorperiode</div>
+                  <div class="rep-kpi-val" id="repKpiPrevTotal" style="color: #6b7280;">0</div>
+               </div>
+            </div>
+            
+            <div class="rep-charts-row">
+               <div class="rep-chart-box">
+                  <h4 style="text-align:center; margin-top:0; color:#374151;">Mitarbeiter Performance</h4>
+                  <div style="position:relative; height: 250px; width:100%;">
+                     <canvas id="repStaffChart"></canvas>
+                  </div>
+               </div>
+               <div class="rep-chart-box">
+                  <h4 style="text-align:center; margin-top:0; color:#374151;">Top 10 Parkplätze</h4>
+                  <div style="position:relative; height: 250px; width:100%;">
+                     <canvas id="repLocChart"></canvas>
+                  </div>
+               </div>
+            </div>
+            <div class="rep-table-box">
+               <h3>Top Standorte (Detail)</h3>
+               <table class="rep-table">
+                  <thead><tr><th>#</th><th>Standort</th><th>Tickets Periode</th><th>Netto-Umsatz</th></tr></thead>
+                  <tbody id="repTableBody"></tbody>
+               </table>
+            </div>
+         </div>
+      </div>
+    </div>
+    
+    <!-- EINGABE TAB -->
+    <div id="eingabe-tab" class="tab-content">
+      <p><strong>1.</strong> Wähle das Datum aus. <br><strong>2.</strong> Klicke in die obere linke Zelle der Tabelle und drücke <strong>Strg + V</strong>, um deine Daten direkt aus Excel einzufügen.</p>
+      
+      <div class="form-group">
+        <label>Datum der Leistung:</label>
+        <input type="date" id="datum" required>
+      </div>
+      
+      <div class="spreadsheet-container">
+        <div id="spreadsheet"></div>
+      </div>
+      
+      <button id="submitBtn" onclick="submitData()" style="width: 100%;">🚀 Daten in Zieltabelle eintragen</button>
+      <div id="eingabeMessage" class="message-box"></div>
+      <div id="previewContainer" style="display:none;"></div> 
+    </div>
+    
+    <!-- STANDORTE TAB -->
+    <div id="standorte-tab" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <p style="margin:0;">Hier findest du alle hinterlegten Standorte passend zur Datumsauswahl. <strong>Tipp:</strong> Klicke auf die Spaltenköpfe, um sie zu sortieren!</p>
+      </div>
+      
+      <div id="locMessage" class="message-box"></div>
+      
+      <div id="newLocationForm" style="display:none; background: #f8fafc; padding: 1.5rem; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 2rem;">
+        <h3 id="formTitle" style="margin-top:0; color: var(--primary);">Standort bearbeiten</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <input type="text" id="locRegion" placeholder="Region (z.B. Nord oder NEU)">
+          <input type="text" id="locKunde" placeholder="Standort / Kunde (z.B. RSG - McFit)">
+          <input type="text" id="locStrasse" placeholder="Straße *">
+          <input type="text" id="locHNr" placeholder="Hausnummer">
+          <input type="text" id="locStadt" placeholder="Stadt (ggf. mit PLZ) *">
+          <input type="text" id="locStaff" placeholder="Mitarbeiter">
+          <input type="text" id="locStart" placeholder="Betriebsstart">
+          <input type="text" id="locStatus" placeholder="Status (z.B. aktive)">
+          <input type="text" id="locGebuehr" placeholder="Gebühr in € (z.B. 15,00)">
+          <input type="text" id="locMahngebuehr" placeholder="Mahngebühr in € (z.B. 5,00)">
+        </div>
+        <button id="saveLocBtn" onclick="saveLocationDetails()" style="margin-top: 1.5rem;">💾 Speichern</button>
+        <button onclick="cancelLocationForm()" class="btn-secondary" style="margin-top: 1.5rem; margin-left: 0.5rem;">Abbrechen</button>
+      </div>
+      
+      <div id="locationsLoader" style="text-align:center; padding: 2rem 0; font-size: 1.1rem;">⏳ Lade Standorte...</div>
+      <div id="locationsTableContainer" style="display:none;"></div>
+    </div>
+    
+  </div>
+
+  <script>
+    document.getElementById('datum').valueAsDate = new Date();
+    
+    let staffChartInstance = null; let locChartInstance = null;
+    let repStaffChartInstance = null; let repLocChartInstance = null;
+    let mySpreadsheet = null;
+    
+    let currentLocationsData = []; let currentLocationsSheetName = '';
+    let currentRowIndex = null; let sortCol = -1; let sortAsc = true;
+    
+    const eurFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+
+    window.onload = function() {
+       loadDashboard();
+    };
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      const tabMap = {'dashboard': 0, 'bericht': 1, 'eingabe': 2, 'standorte': 3};
+      document.querySelectorAll('.tab')[tabMap[tabName]].classList.add('active');
+      document.getElementById(tabName + '-tab').classList.add('active');
+      
+      if(tabName === 'dashboard') { 
+          loadDashboard(); 
+      } else if (tabName === 'standorte') { 
+          loadLocationsList(); 
+      } else if (tabName === 'eingabe') {
+          if (!mySpreadsheet) {
+             mySpreadsheet = jspreadsheet(document.getElementById('spreadsheet'), {
+                data: [['', '', ''],['', '', ''],['', '', ''],['', '', ''],['', '', '']],
+                columns: [
+                    { type: 'text', title: 'Ort', width: 200 },
+                    { type: 'text', title: 'Straße', width: 300 },
+                    { type: 'numeric', title: 'Anzahl', width: 120 }
+                ],
+                minDimensions: [3, 10],
+                allowInsertRow: true,
+                allowInsertColumn: false,
+                allowDeleteRow: true,
+                allowDeleteColumn: false,
+             });
+          }
+      }
+    }
+    
+    function showMsg(id, text, type) {
+      const msg = document.getElementById(id);
+      msg.textContent = text;
+      msg.className = "message-box " + type;
+      msg.style.display = 'block';
+      setTimeout(() => { msg.style.display = 'none'; }, 8000); 
+    }
+
+    function submitData() {
+      const datum = document.getElementById('datum').value;
+      const btn = document.getElementById('submitBtn');
+      
+      if(!datum) {
+        showMsg('eingabeMessage', "Bitte ein Datum auswählen.", "error");
+        return;
+      }
+      
+      if(!mySpreadsheet) return;
+      
+      let rawData = mySpreadsheet.getData();
+      let parsedData = [];
+      let skippedCount = 0;
+
+      for(let i = 0; i < rawData.length; i++) {
+         let ort = rawData[i][0] ? rawData[i][0].toString().trim() : '';
+         let strasse = rawData[i][1] ? rawData[i][1].toString().trim() : '';
+         let anzahl = parseInt(rawData[i][2], 10);
+
+         if(!strasse || isNaN(anzahl) || anzahl <= 0) {
+             if(strasse || ort) skippedCount++; 
+             continue;
+         }
+
+         parsedData.push({ ort: ort, strasse: strasse, anzahl: anzahl });
+      }
+
+      if(parsedData.length === 0) {
+         showMsg('eingabeMessage', "Die Tabelle enthält keine gültigen Tickets.", "error");
+         return;
+      }
+
+      btn.disabled = true; btn.innerText = "⏳ Wird gespeichert...";
+      document.getElementById('previewContainer').style.display = 'none';
+
+      google.script.run.withSuccessHandler(function(response) {
+          if(response.success) {
+            if(response.newLocCount > 0) {
+                document.getElementById('previewContainer').style.display = 'block';
+                document.getElementById('previewContainer').innerHTML = `<div style="text-align:center; padding:2rem 0;"><h3 style="color:#ea580c; margin-top:0;">⚠️ ${response.newLocCount} neue Standorte angelegt!</h3><button onclick="switchTab('standorte')" style="background-color:#f59e0b; color:white; padding:0.75rem 1.5rem; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">➡️ Jetzt bearbeiten</button></div>`;
+            }
+            showMsg('eingabeMessage', response.message, "success");
+            mySpreadsheet.setData([['','',''],['','',''],['','','']]);
+            
+            // NEU: Datum automatisch +1 Tag nach erfolgreichem Upload!
+            let currentDatum = new Date(datum);
+            currentDatum.setDate(currentDatum.getDate() + 1);
+            document.getElementById('datum').valueAsDate = currentDatum;
+            
+            btn.disabled = false;
+            btn.innerText = "🚀 Daten in Zieltabelle eintragen";
+          } else {
+            showMsg('eingabeMessage', response.message, "error");
+            btn.disabled = false; btn.innerText = "🚀 Daten in Zieltabelle eintragen";
+          }
+        }).withFailureHandler(function(error) {
+          btn.disabled = false; btn.innerText = "🚀 Daten in Zieltabelle eintragen";
+          showMsg('eingabeMessage', "Fehler: " + error.message, "error");
+        }).processPastedData(datum, parsedData); 
+    }
+
+    function calcDatesForType(type) {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth();
+      const d = now.getDate();
+      const day = now.getDay() || 7;
+      
+      let start, end;
+
+      if (type === 'thisYear') { 
+          start = new Date(y, 0, 1); 
+          end = new Date(y, 11, 31); 
+      } else if (type === 'lastMonth') { 
+          start = new Date(y, m - 1, 1); 
+          end = new Date(y, m, 0); 
+      } else if (type === 'thisMonth') { 
+          start = new Date(y, m, 1); 
+          end = new Date(y, m + 1, 0); 
+      } else if (type === 'thisWeek') { 
+          start = new Date(y, m, d - day + 1); 
+          start.setHours(0,0,0,0);
+          end = new Date(start); 
+          end.setDate(start.getDate() + 6); 
+      } else if (type === 'lastWeek') { 
+          start = new Date(y, m, d - day - 6); 
+          start.setHours(0,0,0,0);
+          end = new Date(start); 
+          end.setDate(start.getDate() + 6); 
+      }
+
+      const formatStr = (dateObj) => {
+         const yyyy = dateObj.getFullYear();
+         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+         const dd = String(dateObj.getDate()).padStart(2, '0');
+         return `${yyyy}-${mm}-${dd}`;
+      };
+
+      return { s: formatStr(start), e: formatStr(end) };
+    }
+
+    function setDashFilter(type) {
+      const dates = calcDatesForType(type);
+      document.getElementById('dashStart').value = dates.s;
+      document.getElementById('dashEnd').value = dates.e;
+      loadDashboard();
+    }
+    function resetDashboardFilter() { document.getElementById('dashStart').value = ''; document.getElementById('dashEnd').value = ''; loadDashboard(); }
+    
+    function loadDashboard() {
+      document.getElementById('loadingDash').style.display = 'block';
+      const start = document.getElementById('dashStart').value;
+      const end = document.getElementById('dashEnd').value;
+      const baseDatum = document.getElementById('datum').value; 
+      google.script.run.withSuccessHandler(function(response) {
+          document.getElementById('loadingDash').style.display = 'none';
+          if(response.success) { 
+              document.getElementById('dashKpiTotal').innerText = response.currentTotal || 0;
+              document.getElementById('dashKpiRevenue').innerText = eurFormatter.format(response.totalRevenue || 0);
+              renderDashCharts(response); 
+          } else { alert("Fehler: " + response.message); }
+        }).withFailureHandler(function(error) {
+          document.getElementById('loadingDash').style.display = 'none'; alert("Fehler: " + error.message);
+        }).getDashboardStats(start, end, baseDatum);
+    }
+    
+    function renderDashCharts(data) {
+      const staffLabels = data.staff.map(s => s.name); const staffValues = data.staff.map(s => s.count);
+      document.getElementById('staffChartWrapper').style.height = Math.max(300, staffLabels.length * 35 + 80) + 'px';
+      if(staffChartInstance) staffChartInstance.destroy();
+      staffChartInstance = new Chart(document.getElementById('staffChart').getContext('2d'), {
+        type: 'bar', data: { labels: staffLabels, datasets: [{ label: 'Tickets', data: staffValues, backgroundColor: '#10b981', borderRadius: 6, maxBarThickness: 30 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+      });
+      
+      const locLabels = data.locations.map(l => l.name); const locValues = data.locations.map(l => l.count);
+      document.getElementById('locChartWrapper').style.height = Math.max(300, locLabels.length * 35 + 80) + 'px';
+      if(locChartInstance) locChartInstance.destroy();
+      locChartInstance = new Chart(document.getElementById('locationChart').getContext('2d'), {
+        type: 'bar', data: { labels: locLabels, datasets: [{ label: 'Tickets', data: locValues, backgroundColor: '#003366', borderRadius: 6, maxBarThickness: 30 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+      });
+    }
+
+    function setRepFilter(type) {
+      const dates = calcDatesForType(type);
+      document.getElementById('repStart').value = dates.s;
+      document.getElementById('repEnd').value = dates.e;
+      loadReport();
+    }
+
+    function loadReport() {
+      const start = document.getElementById('repStart').value;
+      const end = document.getElementById('repEnd').value;
+      if (!start || !end) { alert("Bitte Start- und Enddatum für den Bericht wählen!"); return; }
+      
+      document.getElementById('loadingRep').style.display = 'block';
+      document.getElementById('reportWrapper').style.display = 'none';
+      document.getElementById('pdfBtn').disabled = true;
+
+      google.script.run.withSuccessHandler(function(response) {
+          document.getElementById('loadingRep').style.display = 'none';
+          if(response.success) {
+            buildReportUI(response);
+          } else { alert("Fehler: " + response.message); }
+      }).withFailureHandler(function(error) {
+          document.getElementById('loadingRep').style.display = 'none';
+          alert("Fehler: " + error.message);
+      }).getReportData(start, end);
+    }
+
+    function buildReportUI(data) {
+      document.getElementById('repDateLabel').innerText = data.dateRange;
+      document.getElementById('repPrevDateLabel').innerText = data.prevRange;
+      document.getElementById('repKpiTotal').innerText = data.currentTotal;
+      document.getElementById('repKpiPrevTotal').innerText = data.previousTotal;
+      document.getElementById('repKpiRevenue').innerText = eurFormatter.format(data.currentRevenue || 0);
+      
+      const trendEl = document.getElementById('repKpiTrend');
+      trendEl.innerText = data.trend;
+      trendEl.className = "rep-kpi-trend " + (data.trendIsPositive ? "trend-pos" : "trend-neg");
+      
+      const revTrendEl = document.getElementById('repKpiRevTrend');
+      revTrendEl.innerText = data.revTrend;
+      revTrendEl.className = "rep-kpi-trend " + (data.revTrendIsPositive ? "trend-pos" : "trend-neg");
+
+      let tBody = "";
+      for(let i=0; i < Math.min(10, data.topLocs.length); i++) {
+         tBody += `<tr><td>${i+1}</td><td>${data.topLocs[i].name}</td><td><strong>${data.topLocs[i].count}</strong></td><td>${eurFormatter.format(data.topLocs[i].revenue || 0)}</td></tr>`;
+      }
+      document.getElementById('repTableBody').innerHTML = tBody;
+
+      const cOptions = { indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } };
+      
+      const sLabels = data.topStaff.slice(0,10).map(s => s.name); 
+      const sVals = data.topStaff.slice(0,10).map(s => s.count);
+      if(repStaffChartInstance) repStaffChartInstance.destroy();
+      repStaffChartInstance = new Chart(document.getElementById('repStaffChart').getContext('2d'), {
+        type: 'bar', data: { labels: sLabels, datasets: [{ data: sVals, backgroundColor: '#10b981', borderRadius: 4 }] }, options: cOptions
+      });
+
+      const lLabels = data.topLocs.slice(0,10).map(l => l.name); 
+      const lVals = data.topLocs.slice(0,10).map(l => l.count);
+      if(repLocChartInstance) repLocChartInstance.destroy();
+      repLocChartInstance = new Chart(document.getElementById('repLocChart').getContext('2d'), {
+        type: 'bar', data: { labels: lLabels, datasets: [{ data: lVals, backgroundColor: '#003366', borderRadius: 4 }] }, options: cOptions
+      });
+
+      document.getElementById('reportWrapper').style.display = 'flex';
+      document.getElementById('pdfBtn').disabled = false;
+    }
+
+    function downloadPDF() {
+      const element = document.getElementById('reportPage');
+      const dateLabel = document.getElementById('repDateLabel').innerText.replace(/\s/g, '').replace(/-/g, '_');
+      const opt = {
+        margin:       0,
+        filename:     `PCN_Bericht_${dateLabel}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      const btn = document.getElementById('pdfBtn');
+      btn.innerText = "⏳ Erstelle PDF...";
+      html2pdf().set(opt).from(element).save().then(() => {
+          btn.innerText = "💾 PDF Speichern";
+      });
+    }
+
+    function loadLocationsList() {
+       document.getElementById('locationsLoader').style.display = 'block';
+       document.getElementById('locationsTableContainer').style.display = 'none';
+       const baseDatum = document.getElementById('datum').value;
+       google.script.run.withSuccessHandler(function(response) {
+            currentLocationsData = response.data; currentLocationsSheetName = response.sheetName; 
+            renderLocationsTable();
+            document.getElementById('locationsLoader').style.display = 'none';
+            document.getElementById('locationsTableContainer').style.display = 'block';
+         }).getLocations(baseDatum);
+    }
+    
+    function sortTable(colIndex) {
+      if (sortCol === colIndex) { sortAsc = !sortAsc; } else { sortCol = colIndex; sortAsc = true; }
+      currentLocationsData.sort((a, b) => {
+        let valA = a[colIndex] ? a[colIndex].toString().toLowerCase() : ''; let valB = b[colIndex] ? b[colIndex].toString().toLowerCase() : '';
+        if (valA < valB) return sortAsc ? -1 : 1; if (valA > valB) return sortAsc ? 1 : -1; return 0;
+      });
+      renderLocationsTable();
+    }
+
+    function renderLocationsTable() {
+      let htmlNew = ''; let htmlAll = '<table class="data-table"><thead><tr>';
+      const headers = ['Region', 'Kunde', 'Straße', 'Hausnr.', 'Stadt', 'Staff', 'Start', 'Status', 'Gebühr', 'Mahngebühr'];
+      headers.forEach((h, i) => { htmlAll += `<th class="sortable" onclick="sortTable(${i})" style="cursor:pointer;" title="Sortieren">${h}${sortCol === i ? (sortAsc ? ' 🔼' : ' 🔽') : ''}</th>`; });
+      htmlAll += '<th>Aktion</th></tr></thead><tbody>';
+      let newLocations = []; let regularLocations = [];
+
+      for(let i = 0; i < currentLocationsData.length; i++) {
+         let row = currentLocationsData[i];
+         let isNew = (String(row[0]).trim().toUpperCase() === 'NEU');
+         let actionBtn = `<div style="white-space:nowrap;">
+                            <button onclick="editRow(${i})" class="btn-edit ${isNew ? 'btn-edit-alert' : ''}" title="Bearbeiten">✏️ Bearbeiten</button>
+                            <button onclick="removeRow(${i})" class="btn-delete" title="Diesen Standort unwiderruflich löschen">🗑️</button>
+                          </div>`;
+         
+         let gVal = row[8] ? (isNaN(parseFloat(row[8].toString().replace(',','.'))) ? row[8] : eurFormatter.format(parseFloat(row[8].toString().replace(',','.')))) : '-';
+         let mVal = row[9] ? (isNaN(parseFloat(row[9].toString().replace(',','.'))) ? row[9] : eurFormatter.format(parseFloat(row[9].toString().replace(',','.')))) : '-';
+
+         let trContent = `<td>${isNew ? '<span style="background:#ef4444;color:white;padding:3px 8px;border-radius:4px;font-size:0.85rem;font-weight:bold;">NEU</span>' : (row[0]||'')}</td>
+           <td>${row[1]||''}</td><td><strong>${row[2]||''}</strong></td><td>${row[3]||''}</td><td>${row[4]||''}</td><td>${row[5]||''}</td><td>${row[6]||''}</td><td>${row[7]||''}</td>
+           <td>${gVal}</td><td>${mVal}</td>
+           <td style="text-align:center;">${actionBtn}</td>`;
+           
+         if(isNew) { newLocations.push(`<tr style="background-color: #fef3c7;">${trContent}</tr>`); } 
+         else { regularLocations.push(`<tr>${trContent}</tr>`); }
+      }
+
+      if(newLocations.length > 0) {
+          htmlNew = `<h3 style="color: #ea580c; margin-top: 0; font-size: 1.4rem;">⚠️ Unbearbeitete neue Standorte (${newLocations.length})</h3>
+                     <div class="grid-preview" style="margin-bottom: 2.5rem; border: 2px solid #f59e0b;"><table class="data-table"><thead><tr>`;
+          headers.forEach(h => { htmlNew += `<th>${h}</th>`; });
+          htmlNew += `<th>Aktion</th></tr></thead><tbody>${newLocations.join('')}</tbody></table></div>
+                      <h3 style="color: #374151; margin-top: 1rem; font-size: 1.4rem;">🏢 Alle aktiven Standorte</h3>`;
+      }
+
+      htmlAll += regularLocations.join('') + '</tbody></table>';
+      document.getElementById('locationsTableContainer').innerHTML = htmlNew + `<div class="grid-preview grid-locations">${htmlAll}</div>`;
+    }
+
+    function openLocationForm() {
+      document.getElementById('newLocationForm').style.display = 'block';
+      document.getElementById('newLocationForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    function cancelLocationForm() { document.getElementById('newLocationForm').style.display = 'none'; currentRowIndex = null; }
+
+    function editRow(dataIndex) {
+      let row = currentLocationsData[dataIndex];
+      currentRowIndex = row[10]; 
+      document.getElementById('locRegion').value = row[0] || ''; document.getElementById('locKunde').value = row[1] || '';
+      document.getElementById('locStrasse').value = row[2] || ''; document.getElementById('locHNr').value = row[3] || '';
+      document.getElementById('locStadt').value = row[4] || ''; document.getElementById('locStaff').value = row[5] || '';
+      document.getElementById('locStart').value = row[6] || ''; document.getElementById('locStatus').value = row[7] || '';
+      
+      document.getElementById('locGebuehr').value = row[8] || ''; 
+      document.getElementById('locMahngebuehr').value = row[9] || '';
+      
+      openLocationForm();
+    }
+    
+    function removeRow(dataIndex) {
+      let row = currentLocationsData[dataIndex];
+      let rowIndex = row[10];
+      let standortName = row[2] || 'Unbekannt';
+      
+      if(confirm(`Möchtest du den Standort "${standortName}" wirklich unwiderruflich aus diesem Monat löschen?`)) {
+         document.getElementById('locationsLoader').style.display = 'block';
+         document.getElementById('locationsTableContainer').style.display = 'none';
+         
+         const payload = {
+            sheetName: currentLocationsSheetName,
+            rowIndex: rowIndex
+         };
+         
+         google.script.run
+           .withSuccessHandler(function(res) {
+              if(res.success) { 
+                 showMsg('locMessage', res.message, 'success'); 
+              } else { 
+                 showMsg('locMessage', res.message, 'error'); 
+              }
+              loadLocationsList(); 
+           })
+           .withFailureHandler(function(error) {
+              showMsg('locMessage', 'Fehler: ' + error.message, 'error');
+              loadLocationsList();
+           })
+           .deleteLocation(payload);
+      }
+    }
+
+    function saveLocationDetails() {
+      const btn = document.getElementById('saveLocBtn');
+      const payload = {
+        sheetName: currentLocationsSheetName, rowIndex: currentRowIndex, 
+        region: document.getElementById('locRegion').value.trim(), standort: document.getElementById('locKunde').value.trim(),
+        strasse: document.getElementById('locStrasse').value.trim(), hausnummer: document.getElementById('locHNr').value.trim(),
+        stadt: document.getElementById('locStadt').value.trim(), staff: document.getElementById('locStaff').value.trim(),
+        start: document.getElementById('locStart').value.trim(), status: document.getElementById('locStatus').value.trim(),
+        gebuehr: document.getElementById('locGebuehr').value.trim(), mahngebuehr: document.getElementById('locMahngebuehr').value.trim()
+      };
+      if(!payload.strasse || !payload.stadt) { showMsg('locMessage', 'Straße und Stadt sind absolute Pflichtfelder!', 'error'); return; }
+      
+      btn.disabled = true; btn.innerText = "⏳ Speichert...";
+      google.script.run.withSuccessHandler(function(res) {
+           btn.disabled = false; btn.innerText = "💾 Speichern";
+           if(res.success) { showMsg('locMessage', res.message, 'success'); loadLocationsList(); setTimeout(() => cancelLocationForm(), 1500); } 
+           else { showMsg('locMessage', res.message, 'error'); }
+        }).withFailureHandler(function(error) {
+           btn.disabled = false; btn.innerText = "💾 Speichern"; showMsg('locMessage', 'Fehler: ' + error.message, 'error');
+        }).saveLocation(payload);
+    }
+  </script>
+</body>
+</html>
