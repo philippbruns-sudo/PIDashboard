@@ -171,6 +171,7 @@
     
     <div class="tabs">
       <div class="tab active" onclick="switchTab('dashboard')">Dashboard</div>
+      <div class="tab" onclick="switchTab('rankings')">📊 Rankings</div>
       <div class="tab" onclick="switchTab('bericht')">📄 Bericht (PDF)</div>
       <div class="tab" onclick="switchTab('eingabe')">Dateneingabe</div>
       <div class="tab" onclick="switchTab('standorte')">Standorte</div>
@@ -213,6 +214,26 @@
       </div>
       
       <div id="loadingDash" style="display:none; text-align:center; margin-bottom: 2rem; font-size: 1.2rem;">⏳ Lade Statistiken aus Google Sheets...</div>
+
+      <div class="chart-container">
+        <div class="chart-title">Standort-Übersicht &amp; Mitarbeiter-Zuweisung</div>
+        <div class="grid-preview grid-locations">
+          <table class="data-table" id="dashLocTable">
+            <thead><tr>
+              <th class="sortable" id="dashTh0" onclick="sortDashLocTable(0)" title="Sortieren">Standort</th>
+              <th class="sortable" id="dashTh1" onclick="sortDashLocTable(1)" title="Sortieren">Mitarbeiter</th>
+              <th class="sortable" id="dashTh2" onclick="sortDashLocTable(2)" title="Sortieren">Tickets</th>
+              <th class="sortable" id="dashTh3" onclick="sortDashLocTable(3)" title="Sortieren">Umsatz</th>
+            </tr></thead>
+            <tbody id="dashLocTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- RANKINGS TAB -->
+    <div id="rankings-tab" class="tab-content">
+      <p>Ranking der Mitarbeiter und Parkplätze für den im Dashboard-Tab gewählten Zeitraum (<span id="rankingsPeriodLabel">–</span>).</p>
       <div class="dashboard-grid">
         <div class="chart-container">
           <div class="chart-title">Mitarbeiter Ranking</div>
@@ -225,21 +246,6 @@
           <div class="chart-wrapper" id="locChartWrapper">
              <canvas id="locationChart"></canvas>
           </div>
-        </div>
-      </div>
-
-      <div class="chart-container" style="margin-top: 2rem;">
-        <div class="chart-title">Standort-Übersicht &amp; Mitarbeiter-Zuweisung</div>
-        <div class="grid-preview grid-locations">
-          <table class="data-table" id="dashLocTable">
-            <thead><tr>
-              <th class="sortable" id="dashTh0" onclick="sortDashLocTable(0)" title="Sortieren">Standort</th>
-              <th class="sortable" id="dashTh1" onclick="sortDashLocTable(1)" title="Sortieren">Mitarbeiter</th>
-              <th class="sortable" id="dashTh2" onclick="sortDashLocTable(2)" title="Sortieren">Tickets</th>
-              <th class="sortable" id="dashTh3" onclick="sortDashLocTable(3)" title="Sortieren">Umsatz</th>
-            </tr></thead>
-            <tbody id="dashLocTableBody"></tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -397,13 +403,16 @@
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       
-      const tabMap = {'dashboard': 0, 'bericht': 1, 'eingabe': 2, 'standorte': 3};
+      const tabMap = {'dashboard': 0, 'rankings': 1, 'bericht': 2, 'eingabe': 3, 'standorte': 4};
       document.querySelectorAll('.tab')[tabMap[tabName]].classList.add('active');
       document.getElementById(tabName + '-tab').classList.add('active');
-      
-      if(tabName === 'dashboard') { 
-          loadDashboard(); 
-      } else if (tabName === 'standorte') { 
+
+      if(tabName === 'dashboard') {
+          loadDashboard();
+      } else if (tabName === 'rankings') {
+          if(staffChartInstance) staffChartInstance.resize();
+          if(locChartInstance) locChartInstance.resize();
+      } else if (tabName === 'standorte') {
           loadLocationsList(); 
       } else if (tabName === 'eingabe') {
           if (!mySpreadsheet) {
@@ -549,10 +558,11 @@
       const baseDatum = document.getElementById('datum').value; 
       google.script.run.withSuccessHandler(function(response) {
           document.getElementById('loadingDash').style.display = 'none';
-          if(response.success) { 
+          if(response.success) {
               document.getElementById('dashKpiTotal').innerText = response.currentTotal || 0;
               document.getElementById('dashKpiRevenue').innerText = eurFormatter.format(response.totalRevenue || 0);
-              renderDashCharts(response); 
+              document.getElementById('rankingsPeriodLabel').innerText = response.sheetName || '–';
+              renderDashCharts(response);
           } else { alert("Fehler: " + response.message); }
         }).withFailureHandler(function(error) {
           document.getElementById('loadingDash').style.display = 'none'; alert("Fehler: " + error.message);
