@@ -131,7 +131,19 @@
     /* SPREADSHEET EINGABE */
     .spreadsheet-container { margin-bottom: 1.5rem; }
     .jexcel_container { border: 1px solid var(--border); border-radius: 8px; max-width: 100%; overflow-x: auto;}
-    
+
+    /* TAGESDATEN */
+    .daily-table { border-collapse: collapse; font-size: 0.85rem; white-space: nowrap; width: auto; }
+    .daily-table th, .daily-table td { border: 1px solid var(--border); padding: 4px 6px; text-align: center; }
+    .daily-table th { background: #e5e7eb; color: #374151; position: sticky; top: 0; z-index: 2; }
+    .daily-table td.daily-loc-cell, .daily-table th.daily-loc-th { position: sticky; background: #ffffff; z-index: 1; text-align: left; min-width: 170px; }
+    .daily-table th.daily-loc-th { z-index: 3; background: #e5e7eb; }
+    .daily-table td.daily-total-cell { font-weight: 700; background: #f9fafb; }
+    .daily-input { width: 38px; text-align: center; border: 1px solid transparent; border-radius: 4px; padding: 3px 2px; font-size: 0.85rem; background: transparent; font-family: inherit; }
+    .daily-input:focus { border-color: var(--primary); background: #ffffff; outline: none; }
+    .daily-input.saved { background: #d1fae5 !important; }
+    .daily-input.error { background: #fee2e2 !important; }
+
     /* BERICHT PREVIEW */
     .report-preview-container { background: #e5e7eb; padding: 2rem; display: flex; justify-content: center; border-radius: 8px; border: 1px solid var(--border); }
     .report-page { width: 210mm; min-height: 297mm; background: white; padding: 15mm; box-shadow: 0 10px 25px rgba(0,0,0,0.1); box-sizing: border-box; font-family: Arial, sans-serif; color: #1f2937; }
@@ -174,6 +186,7 @@
       <div class="tab" onclick="switchTab('rankings')">📊 Rankings</div>
       <div class="tab" onclick="switchTab('bericht')">📄 Bericht (PDF)</div>
       <div class="tab" onclick="switchTab('eingabe')">Dateneingabe</div>
+      <div class="tab" onclick="switchTab('tagesdaten')">🗓️ Tagesdaten</div>
       <div class="tab" onclick="switchTab('standorte')">Standorte</div>
     </div>
     
@@ -222,8 +235,9 @@
             <th class="sortable" id="dashTh0" onclick="sortDashLocTable(0)" title="Sortieren">Standort</th>
             <th class="sortable" id="dashTh1" onclick="sortDashLocTable(1)" title="Sortieren">Adresse</th>
             <th class="sortable" id="dashTh2" onclick="sortDashLocTable(2)" title="Sortieren">Mitarbeiter</th>
-            <th class="sortable" id="dashTh3" onclick="sortDashLocTable(3)" title="Sortieren">Tickets</th>
-            <th class="sortable" id="dashTh4" onclick="sortDashLocTable(4)" title="Sortieren">Umsatz</th>
+            <th class="sortable" id="dashTh3" onclick="sortDashLocTable(3)" title="Sortieren, laufender Monat">Erfasste Tage</th>
+            <th class="sortable" id="dashTh4" onclick="sortDashLocTable(4)" title="Sortieren">Tickets</th>
+            <th class="sortable" id="dashTh5" onclick="sortDashLocTable(5)" title="Sortieren">Umsatz</th>
           </tr></thead>
           <tbody id="dashLocTableBody"></tbody>
         </table>
@@ -345,9 +359,27 @@
       
       <button id="submitBtn" onclick="submitData()" style="width: 100%;">🚀 Daten in Zieltabelle eintragen</button>
       <div id="eingabeMessage" class="message-box"></div>
-      <div id="previewContainer" style="display:none;"></div> 
+      <div id="previewContainer" style="display:none;"></div>
     </div>
-    
+
+    <!-- TAGESDATEN TAB -->
+    <div id="tagesdaten-tab" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <p style="margin:0 0 0.75rem 0;">Tageweise Rohdaten pro Standort. Klicke in eine Zelle, um den Wert direkt zu bearbeiten – die Änderung wird sofort gespeichert.</p>
+          <div class="form-group" style="margin-bottom:0; max-width: 220px;">
+            <label>Monat:</label>
+            <input type="month" id="tagesdatenMonat">
+          </div>
+        </div>
+        <button onclick="loadTagesdaten()" class="btn-success filter-btn">🔄 Laden</button>
+      </div>
+
+      <div id="tagesdatenMessage" class="message-box"></div>
+      <div id="tagesdatenLoader" style="text-align:center; padding: 2rem 0; font-size: 1.1rem;">⏳ Lade Tagesdaten...</div>
+      <div id="tagesdatenTableContainer" style="display:none; overflow-x:auto; border: 1px solid var(--border); border-radius: 8px;"></div>
+    </div>
+
     <!-- STANDORTE TAB -->
     <div id="standorte-tab" class="tab-content">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
@@ -390,19 +422,23 @@
     let currentLocationsData = []; let currentLocationsSheetName = '';
     let currentRowIndex = null; let sortCol = -1; let sortAsc = true;
 
-    let currentDashLocations = []; let dashSortCol = 2; let dashSortAsc = false;
+    let currentDashLocations = []; let dashSortCol = 4; let dashSortAsc = false;
+
+    let currentTagesdaten = null;
     
     const eurFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
     window.onload = function() {
+       const now = new Date();
+       document.getElementById('tagesdatenMonat').value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
        loadDashboard();
     };
 
     function switchTab(tabName) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      
-      const tabMap = {'dashboard': 0, 'rankings': 1, 'bericht': 2, 'eingabe': 3, 'standorte': 4};
+
+      const tabMap = {'dashboard': 0, 'rankings': 1, 'bericht': 2, 'eingabe': 3, 'tagesdaten': 4, 'standorte': 5};
       document.querySelectorAll('.tab')[tabMap[tabName]].classList.add('active');
       document.getElementById(tabName + '-tab').classList.add('active');
 
@@ -411,8 +447,10 @@
       } else if (tabName === 'rankings') {
           if(staffChartInstance) staffChartInstance.resize();
           if(locChartInstance) locChartInstance.resize();
+      } else if (tabName === 'tagesdaten') {
+          loadTagesdaten();
       } else if (tabName === 'standorte') {
-          loadLocationsList(); 
+          loadLocationsList();
       } else if (tabName === 'eingabe') {
           if (!mySpreadsheet) {
              mySpreadsheet = jspreadsheet(document.getElementById('spreadsheet'), {
@@ -562,10 +600,25 @@
               document.getElementById('dashKpiRevenue').innerText = eurFormatter.format(response.totalRevenue || 0);
               document.getElementById('rankingsPeriodLabel').innerText = response.sheetName || '–';
               renderDashCharts(response);
+              loadDashCoverage(baseDatum);
           } else { alert("Fehler: " + response.message); }
         }).withFailureHandler(function(error) {
           document.getElementById('loadingDash').style.display = 'none'; alert("Fehler: " + error.message);
         }).getDashboardStats(start, end, baseDatum);
+    }
+
+    function loadDashCoverage(baseDatum) {
+      google.script.run.withSuccessHandler(function(response) {
+          if(!response.success) return;
+          const byName = {};
+          response.data.forEach(d => { byName[d.name] = d; });
+          currentDashLocations.forEach(l => {
+            const cov = byName[l.name];
+            l.coverageRecorded = cov ? cov.recordedDays : null;
+            l.coverageTotal = cov ? cov.totalDays : null;
+          });
+          renderDashLocTable();
+        }).getDataCompleteness(baseDatum);
     }
     
     function renderDashCharts(data) {
@@ -590,7 +643,7 @@
     }
 
     function sortDashLocTable(col) {
-      if (dashSortCol === col) { dashSortAsc = !dashSortAsc; } else { dashSortCol = col; dashSortAsc = (col !== 3 && col !== 4); }
+      if (dashSortCol === col) { dashSortAsc = !dashSortAsc; } else { dashSortCol = col; dashSortAsc = (col !== 3 && col !== 4 && col !== 5); }
       renderDashLocTable();
     }
 
@@ -600,7 +653,8 @@
         if (dashSortCol === 0) { valA = a.name.toLowerCase(); valB = b.name.toLowerCase(); }
         else if (dashSortCol === 1) { valA = (a.address || '').toLowerCase(); valB = (b.address || '').toLowerCase(); }
         else if (dashSortCol === 2) { valA = (a.staff || '').toLowerCase(); valB = (b.staff || '').toLowerCase(); }
-        else if (dashSortCol === 3) { valA = a.count; valB = b.count; }
+        else if (dashSortCol === 3) { valA = a.coverageRecorded != null ? a.coverageRecorded : -1; valB = b.coverageRecorded != null ? b.coverageRecorded : -1; }
+        else if (dashSortCol === 4) { valA = a.count; valB = b.count; }
         else { valA = a.revenue; valB = b.revenue; }
         if (valA < valB) return dashSortAsc ? -1 : 1;
         if (valA > valB) return dashSortAsc ? 1 : -1;
@@ -609,12 +663,17 @@
 
       let html = '';
       currentDashLocations.forEach(l => {
-        html += `<tr><td>${l.name}</td><td>${l.address || '-'}</td><td>${l.staff || 'Ohne Zuweisung'}</td><td>${l.count}</td><td>${eurFormatter.format(l.revenue || 0)}</td></tr>`;
+        let coverageCell = '-';
+        if (l.coverageTotal != null) {
+          const incomplete = l.coverageRecorded < l.coverageTotal;
+          coverageCell = `<span style="${incomplete ? 'color:#ea580c; font-weight:600;' : ''}">${l.coverageRecorded} / ${l.coverageTotal} Tage</span>`;
+        }
+        html += `<tr><td>${l.name}</td><td>${l.address || '-'}</td><td>${l.staff || 'Ohne Zuweisung'}</td><td>${coverageCell}</td><td>${l.count}</td><td>${eurFormatter.format(l.revenue || 0)}</td></tr>`;
       });
-      document.getElementById('dashLocTableBody').innerHTML = html || '<tr><td colspan="5" style="text-align:center; color:#6b7280;">Keine Daten im gewählten Zeitraum.</td></tr>';
+      document.getElementById('dashLocTableBody').innerHTML = html || '<tr><td colspan="6" style="text-align:center; color:#6b7280;">Keine Daten im gewählten Zeitraum.</td></tr>';
 
-      const labels = ['Standort', 'Adresse', 'Mitarbeiter', 'Tickets', 'Umsatz'];
-      for (let i = 0; i < 5; i++) {
+      const labels = ['Standort', 'Adresse', 'Mitarbeiter', 'Erfasste Tage', 'Tickets', 'Umsatz'];
+      for (let i = 0; i < 6; i++) {
         document.getElementById('dashTh' + i).innerText = labels[i] + (dashSortCol === i ? (dashSortAsc ? ' 🔼' : ' 🔽') : '');
       }
     }
@@ -703,6 +762,89 @@
       html2pdf().set(opt).from(element).save().then(() => {
           btn.innerText = "💾 PDF Speichern";
       });
+    }
+
+    function loadTagesdaten() {
+      const monthVal = document.getElementById('tagesdatenMonat').value;
+      if (!monthVal) { showMsg('tagesdatenMessage', 'Bitte einen Monat auswählen.', 'error'); return; }
+
+      document.getElementById('tagesdatenLoader').style.display = 'block';
+      document.getElementById('tagesdatenTableContainer').style.display = 'none';
+
+      google.script.run.withSuccessHandler(function(response) {
+          document.getElementById('tagesdatenLoader').style.display = 'none';
+          if (response.success) {
+            currentTagesdaten = response;
+            renderTagesdatenTable();
+            document.getElementById('tagesdatenTableContainer').style.display = 'block';
+            if (!response.sheetExists) {
+              showMsg('tagesdatenMessage', `Für ${response.sheetName} existiert noch kein Tabellenblatt.`, 'error');
+            }
+          } else {
+            showMsg('tagesdatenMessage', response.message, 'error');
+          }
+        }).withFailureHandler(function(error) {
+          document.getElementById('tagesdatenLoader').style.display = 'none';
+          showMsg('tagesdatenMessage', 'Fehler: ' + error.message, 'error');
+        }).getDailyData(monthVal);
+    }
+
+    function renderTagesdatenTable() {
+      const data = currentTagesdaten;
+      const container = document.getElementById('tagesdatenTableContainer');
+      if (!data || !data.rows || data.rows.length === 0) {
+        container.innerHTML = '<p style="padding:1rem; margin:0; color:#6b7280;">Keine Standorte für diesen Monat gefunden.</p>';
+        return;
+      }
+
+      let html = '<table class="daily-table"><thead><tr>';
+      html += '<th class="daily-loc-th" style="left:0;">Standort</th>';
+      html += '<th class="daily-loc-th" style="left:172px;">Mitarbeiter</th>';
+      for (let d = 1; d <= data.daysInMonth; d++) { html += `<th>${d}</th>`; }
+      html += '<th>Summe</th></tr></thead><tbody>';
+
+      data.rows.forEach((row, arrIdx) => {
+        let sum = 0;
+        row.days.forEach(v => { const n = parseInt(v, 10); if (!isNaN(n)) sum += n; });
+
+        html += `<tr><td class="daily-loc-cell" style="left:0;"><strong>${row.standort}</strong>${row.stadt ? ' (' + row.stadt + ')' : ''}</td>`;
+        html += `<td class="daily-loc-cell" style="left:172px;">${row.staff || 'Ohne Zuweisung'}</td>`;
+        row.days.forEach((v, dIdx) => {
+          const day = dIdx + 1;
+          html += `<td><input type="text" inputmode="numeric" class="daily-input" value="${v === '' ? '' : v}" data-row="${row.rowIndex}" data-day="${day}" data-arridx="${arrIdx}" onchange="saveDailyValue(this)"></td>`;
+        });
+        html += `<td class="daily-total-cell" id="dailySum-${row.rowIndex}">${sum}</td></tr>`;
+      });
+      html += '</tbody></table>';
+
+      container.innerHTML = html;
+    }
+
+    function saveDailyValue(inputEl) {
+      const rowIndex = inputEl.dataset.row;
+      const day = parseInt(inputEl.dataset.day, 10);
+      const arrIdx = parseInt(inputEl.dataset.arridx, 10);
+      const value = inputEl.value.trim();
+      inputEl.classList.remove('saved', 'error');
+
+      google.script.run.withSuccessHandler(function(res) {
+          if (res.success) {
+            inputEl.classList.add('saved');
+            setTimeout(() => inputEl.classList.remove('saved'), 1500);
+
+            currentTagesdaten.rows[arrIdx].days[day - 1] = value;
+            let sum = 0;
+            currentTagesdaten.rows[arrIdx].days.forEach(v => { const n = parseInt(v, 10); if (!isNaN(n)) sum += n; });
+            const sumCell = document.getElementById('dailySum-' + rowIndex);
+            if (sumCell) sumCell.innerText = sum;
+          } else {
+            inputEl.classList.add('error');
+            showMsg('tagesdatenMessage', res.message, 'error');
+          }
+        }).withFailureHandler(function(error) {
+          inputEl.classList.add('error');
+          showMsg('tagesdatenMessage', 'Fehler: ' + error.message, 'error');
+        }).updateDailyValue({ sheetName: currentTagesdaten.sheetName, rowIndex: rowIndex, day: day, value: value });
     }
 
     function loadLocationsList() {

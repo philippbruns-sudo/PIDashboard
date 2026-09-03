@@ -202,6 +202,56 @@ function getDashboardStats(startDateStr, endDateStr, baseDateStr) {
   }
 }
 
+function getDataCompleteness(baseDateStr) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+    var baseDateObj = baseDateStr ? parseISODate(baseDateStr) : new Date();
+    var targetSheetName = monthNames[baseDateObj.getMonth()] + " " + baseDateObj.getFullYear();
+    var sheet = ss.getSheetByName(targetSheetName) || ss.getSheets()[0];
+
+    var sM = monthNames.indexOf(sheet.getName().split(" ")[0]);
+    var sY = parseInt(sheet.getName().split(" ")[1], 10);
+    var daysInMonth = new Date(sY, sM + 1, 0).getDate();
+
+    var today = new Date();
+    var isCurrentMonth = (today.getFullYear() === sY && today.getMonth() === sM);
+    var maxDay = isCurrentMonth ? today.getDate() : daysInMonth;
+
+    var lastRow = sheet.getLastRow();
+    var result = [];
+
+    if (lastRow >= 1) {
+      var lastCol = Math.max(sheet.getLastColumn(), 10 + maxDay);
+      var data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+
+      for (var i = 0; i < data.length; i++) {
+        var standort = data[i][1];
+        if (!standort) continue;
+        var stadt = data[i][4];
+
+        var recorded = 0;
+        for (var d = 1; d <= maxDay; d++) {
+          var val = data[i][9 + d];
+          if (val !== "" && val !== null && val !== undefined) recorded++;
+        }
+
+        result.push({
+          name: standort + " (" + stadt + ")",
+          recordedDays: recorded,
+          totalDays: maxDay
+        });
+      }
+    }
+
+    return { success: true, data: result, sheetName: sheet.getName(), maxDay: maxDay, daysInMonth: daysInMonth };
+
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
 function processPastedData(dateString, parsedData) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -327,6 +377,80 @@ function getLocations(baseDateStr) {
      result.push(row);
   }
   return { data: result, sheetName: sheet.getName() };
+}
+
+function getDailyData(monthStr) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+    var parts = monthStr.split("-");
+    var y = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10) - 1;
+    var targetSheetName = monthNames[m] + " " + y;
+    var daysInMonth = new Date(y, m + 1, 0).getDate();
+
+    var sheet = ss.getSheetByName(targetSheetName);
+    if (!sheet) return { success: true, rows: [], daysInMonth: daysInMonth, sheetName: targetSheetName, sheetExists: false };
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 1) return { success: true, rows: [], daysInMonth: daysInMonth, sheetName: sheet.getName(), sheetExists: true };
+
+    var lastCol = Math.max(sheet.getLastColumn(), 10 + daysInMonth);
+    var data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+
+    var rows = [];
+    for (var i = 0; i < data.length; i++) {
+      var standort = data[i][1];
+      if (!standort) continue;
+
+      var days = [];
+      for (var d = 1; d <= daysInMonth; d++) {
+        var val = data[i][9 + d];
+        days.push((val === "" || val === null || val === undefined) ? "" : val);
+      }
+
+      rows.push({
+        rowIndex: i + 1,
+        standort: standort,
+        stadt: data[i][4] || "",
+        staff: data[i][5] || "",
+        days: days
+      });
+    }
+
+    return { success: true, rows: rows, daysInMonth: daysInMonth, sheetName: sheet.getName(), sheetExists: true };
+
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+function updateDailyValue(payload) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(payload.sheetName);
+    if (!sheet) return { success: false, message: "Tabellenblatt nicht gefunden." };
+
+    var rowIndex = parseInt(payload.rowIndex, 10);
+    var day = parseInt(payload.day, 10);
+    if (isNaN(rowIndex) || rowIndex < 1) return { success: false, message: "Ungültige Zeile." };
+    if (isNaN(day) || day < 1 || day > 31) return { success: false, message: "Ungültiger Tag." };
+    var col = 10 + day;
+
+    var rawValue = payload.value === null || payload.value === undefined ? "" : payload.value.toString().trim();
+    var value = rawValue;
+    if (rawValue !== "") {
+      value = parseInt(rawValue, 10);
+      if (isNaN(value) || value < 0) return { success: false, message: "Bitte eine gültige, positive Zahl eingeben." };
+    }
+
+    sheet.getRange(rowIndex, col).setValue(value);
+    return { success: true };
+
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
 }
 
 function saveLocation(locData) {
