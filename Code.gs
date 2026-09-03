@@ -43,18 +43,21 @@ function aggregatePeriod(startObj, endObj, sheets, monthNames) {
     var data = sheet.getDataRange().getValues();
     
     for (var i = 0; i < data.length; i++) {
-      var standort = data[i][1]; 
-      var stadt = data[i][4];    
+      var standort = data[i][1];
+      var strasse = data[i][2];
+      var hausnummer = data[i][3];
+      var stadt = data[i][4];
       var staff = data[i][5] || "Ohne Zuweisung";
-      
+
       var gebuehrRaw = data[i][8];
       var gebuehr = parseFloat((gebuehrRaw||"").toString().replace(',', '.')) || 0;
-      
+
       if (!standort) continue;
 
       var locationName = standort + " (" + stadt + ")";
+      var address = ((strasse||"").toString().trim() + " " + (hausnummer||"").toString().trim()).trim();
 
-      if (!stats.locs[locationName]) stats.locs[locationName] = { count: 0, revenue: 0, staffSet: {} };
+      if (!stats.locs[locationName]) stats.locs[locationName] = { count: 0, revenue: 0, staffSet: {}, address: address };
       stats.locs[locationName].staffSet[staff] = true;
 
       for (var col = 10; col < data[i].length; col++) {
@@ -99,7 +102,7 @@ function getReportData(startDateStr, endDateStr) {
     var statsP1 = aggregatePeriod(startP1, endP1, sheets, monthNames);
     var statsP2 = aggregatePeriod(startP2, endP2, sheets, monthNames);
 
-    var locArray = Object.keys(statsP1.locs).map(function(k) { return {name: k, count: statsP1.locs[k].count, revenue: statsP1.locs[k].revenue, staff: Object.keys(statsP1.locs[k].staffSet).join(", ")}; });
+    var locArray = Object.keys(statsP1.locs).map(function(k) { return {name: k, count: statsP1.locs[k].count, revenue: statsP1.locs[k].revenue, staff: Object.keys(statsP1.locs[k].staffSet).join(", "), address: statsP1.locs[k].address}; });
     locArray.sort(function(a, b) { return b.count - a.count; });
     
     var staffArray = Object.keys(statsP1.staff).map(function(k) { return {name: k, count: statsP1.staff[k].count, revenue: statsP1.staff[k].revenue}; });
@@ -176,7 +179,7 @@ function getDashboardStats(startDateStr, endDateStr, baseDateStr) {
     
     var stats = aggregatePeriod(startObj, endObj, sheets, monthNames);
     
-    var locationArray = Object.keys(stats.locs).map(function(key) { return {name: key, count: stats.locs[key].count, revenue: stats.locs[key].revenue, staff: Object.keys(stats.locs[key].staffSet).join(", ")}; });
+    var locationArray = Object.keys(stats.locs).map(function(key) { return {name: key, count: stats.locs[key].count, revenue: stats.locs[key].revenue, staff: Object.keys(stats.locs[key].staffSet).join(", "), address: stats.locs[key].address}; });
     locationArray.sort(function(a, b) { return b.count - a.count; });
     
     var staffArray = Object.keys(stats.staff).map(function(key) { return {name: key, count: stats.staff[key].count, revenue: stats.staff[key].revenue}; });
