@@ -216,18 +216,16 @@
       <div id="loadingDash" style="display:none; text-align:center; margin-bottom: 2rem; font-size: 1.2rem;">⏳ Lade Statistiken aus Google Sheets...</div>
 
       <div class="chart-container">
-        <div class="chart-title">Standort-Übersicht &amp; Mitarbeiter-Zuweisung</div>
-        <div class="grid-preview grid-locations">
-          <table class="data-table" id="dashLocTable">
-            <thead><tr>
-              <th class="sortable" id="dashTh0" onclick="sortDashLocTable(0)" title="Sortieren">Standort</th>
-              <th class="sortable" id="dashTh1" onclick="sortDashLocTable(1)" title="Sortieren">Mitarbeiter</th>
-              <th class="sortable" id="dashTh2" onclick="sortDashLocTable(2)" title="Sortieren">Tickets</th>
-              <th class="sortable" id="dashTh3" onclick="sortDashLocTable(3)" title="Sortieren">Umsatz</th>
-            </tr></thead>
-            <tbody id="dashLocTableBody"></tbody>
-          </table>
-        </div>
+        <div class="chart-title">Standort-Übersicht &amp; Mitarbeiter-Zuweisung (alle Standorte)</div>
+        <table class="data-table" id="dashLocTable">
+          <thead><tr>
+            <th class="sortable" id="dashTh0" onclick="sortDashLocTable(0)" title="Sortieren">Standort</th>
+            <th class="sortable" id="dashTh1" onclick="sortDashLocTable(1)" title="Sortieren">Mitarbeiter</th>
+            <th class="sortable" id="dashTh2" onclick="sortDashLocTable(2)" title="Sortieren">Tickets</th>
+            <th class="sortable" id="dashTh3" onclick="sortDashLocTable(3)" title="Sortieren">Umsatz</th>
+          </tr></thead>
+          <tbody id="dashLocTableBody"></tbody>
+        </table>
       </div>
     </div>
 

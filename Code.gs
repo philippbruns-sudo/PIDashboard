@@ -50,10 +50,13 @@ function aggregatePeriod(startObj, endObj, sheets, monthNames) {
       var gebuehrRaw = data[i][8];
       var gebuehr = parseFloat((gebuehrRaw||"").toString().replace(',', '.')) || 0;
       
-      if (!standort) continue; 
-      
+      if (!standort) continue;
+
       var locationName = standort + " (" + stadt + ")";
-      
+
+      if (!stats.locs[locationName]) stats.locs[locationName] = { count: 0, revenue: 0, staffSet: {} };
+      stats.locs[locationName].staffSet[staff] = true;
+
       for (var col = 10; col < data[i].length; col++) {
         var val = parseInt(data[i][col], 10);
         if (!isNaN(val) && val > 0) {
@@ -69,10 +72,8 @@ function aggregatePeriod(startObj, endObj, sheets, monthNames) {
              stats.staff[staff].count += val;
              stats.staff[staff].revenue += netto;
 
-             if (!stats.locs[locationName]) stats.locs[locationName] = { count: 0, revenue: 0, staffSet: {} };
              stats.locs[locationName].count += val;
              stats.locs[locationName].revenue += netto;
-             stats.locs[locationName].staffSet[staff] = true;
           }
         }
       }
