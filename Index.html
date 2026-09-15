@@ -133,11 +133,17 @@
     .jexcel_container { border: 1px solid var(--border); border-radius: 8px; max-width: 100%; overflow-x: auto;}
 
     /* TAGESDATEN */
-    .daily-table { border-collapse: collapse; font-size: 0.85rem; white-space: nowrap; width: auto; }
-    .daily-table th, .daily-table td { border: 1px solid var(--border); padding: 4px 6px; text-align: center; }
+    /* border-collapse:separate (not collapse) because sticky positioning on
+       table cells is unreliable with collapsed borders in some browsers (Safari). */
+    .daily-table { border-collapse: separate; border-spacing: 0; font-size: 0.85rem; white-space: nowrap; width: auto; }
+    .daily-table th, .daily-table td { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 4px 6px; text-align: center; box-sizing: border-box; }
+    .daily-table th { border-top: 1px solid var(--border); }
+    .daily-table th:first-child, .daily-table td:first-child { border-left: 1px solid var(--border); }
     .daily-table th { background: #e5e7eb; color: #374151; position: sticky; top: 0; z-index: 2; }
-    .daily-table td.daily-loc-cell, .daily-table th.daily-loc-th { position: sticky; background: #ffffff; z-index: 1; text-align: left; min-width: 170px; }
+    .daily-table td.daily-loc-cell, .daily-table th.daily-loc-th { position: sticky; background: #ffffff; z-index: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; }
     .daily-table th.daily-loc-th { z-index: 3; background: #e5e7eb; }
+    .daily-table .daily-loc-col-1 { left: 0; width: 160px; max-width: 160px; }
+    .daily-table .daily-loc-col-2 { left: 160px; width: 130px; max-width: 130px; }
     .daily-table td.daily-total-cell { font-weight: 700; background: #f9fafb; }
     .daily-table input.daily-input { height: auto; width: 40px; box-sizing: border-box; text-align: center; border: 1px solid #d1d5db; border-radius: 4px; padding: 4px 2px; font-size: 0.9rem; color: var(--text); background: #ffffff; font-family: inherit; }
     .daily-table input.daily-input:focus { border-color: var(--primary); background: #ffffff; outline: none; box-shadow: none; }
@@ -798,8 +804,8 @@
       }
 
       let html = '<table class="daily-table"><thead><tr>';
-      html += '<th class="daily-loc-th" style="left:0;">Standort</th>';
-      html += '<th class="daily-loc-th" style="left:172px;">Mitarbeiter</th>';
+      html += '<th class="daily-loc-th daily-loc-col-1">Standort</th>';
+      html += '<th class="daily-loc-th daily-loc-col-2">Mitarbeiter</th>';
       for (let d = 1; d <= data.daysInMonth; d++) { html += `<th>${d}</th>`; }
       html += '<th>Summe</th></tr></thead><tbody>';
 
@@ -807,8 +813,10 @@
         let sum = 0;
         row.days.forEach(v => { const n = parseInt(v, 10); if (!isNaN(n)) sum += n; });
 
-        html += `<tr><td class="daily-loc-cell" style="left:0;"><strong>${row.standort}</strong>${row.stadt ? ' (' + row.stadt + ')' : ''}</td>`;
-        html += `<td class="daily-loc-cell" style="left:172px;">${row.staff || 'Ohne Zuweisung'}</td>`;
+        const locLabel = row.standort + (row.stadt ? ' (' + row.stadt + ')' : '');
+        const staffLabel = row.staff || 'Ohne Zuweisung';
+        html += `<tr><td class="daily-loc-cell daily-loc-col-1" title="${locLabel}"><strong>${locLabel}</strong></td>`;
+        html += `<td class="daily-loc-cell daily-loc-col-2" title="${staffLabel}">${staffLabel}</td>`;
         row.days.forEach((v, dIdx) => {
           const day = dIdx + 1;
           html += `<td><input type="text" inputmode="numeric" class="daily-input" value="${v === '' ? '' : v}" data-row="${row.rowIndex}" data-day="${day}" data-arridx="${arrIdx}" onchange="saveDailyValue(this)"></td>`;
