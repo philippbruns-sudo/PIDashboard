@@ -202,56 +202,6 @@ function getDashboardStats(startDateStr, endDateStr, baseDateStr) {
   }
 }
 
-function getDataCompleteness(baseDateStr) {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
-
-    var baseDateObj = baseDateStr ? parseISODate(baseDateStr) : new Date();
-    var targetSheetName = monthNames[baseDateObj.getMonth()] + " " + baseDateObj.getFullYear();
-    var sheet = ss.getSheetByName(targetSheetName) || ss.getSheets()[0];
-
-    var sM = monthNames.indexOf(sheet.getName().split(" ")[0]);
-    var sY = parseInt(sheet.getName().split(" ")[1], 10);
-    var daysInMonth = new Date(sY, sM + 1, 0).getDate();
-
-    var today = new Date();
-    var isCurrentMonth = (today.getFullYear() === sY && today.getMonth() === sM);
-    var maxDay = isCurrentMonth ? today.getDate() : daysInMonth;
-
-    var lastRow = sheet.getLastRow();
-    var result = [];
-
-    if (lastRow >= 1) {
-      var lastCol = Math.max(sheet.getLastColumn(), 10 + maxDay);
-      var data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-
-      for (var i = 0; i < data.length; i++) {
-        var standort = data[i][1];
-        if (!standort) continue;
-        var stadt = data[i][4];
-
-        var recorded = 0;
-        for (var d = 1; d <= maxDay; d++) {
-          var val = data[i][9 + d];
-          if (val !== "" && val !== null && val !== undefined) recorded++;
-        }
-
-        result.push({
-          name: standort + " (" + stadt + ")",
-          recordedDays: recorded,
-          totalDays: maxDay
-        });
-      }
-    }
-
-    return { success: true, data: result, sheetName: sheet.getName(), maxDay: maxDay, daysInMonth: daysInMonth };
-
-  } catch (e) {
-    return { success: false, message: e.message };
-  }
-}
-
 function processPastedData(dateString, parsedData) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();

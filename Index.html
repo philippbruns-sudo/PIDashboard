@@ -241,9 +241,8 @@
             <th class="sortable" id="dashTh0" onclick="sortDashLocTable(0)" title="Sortieren">Standort</th>
             <th class="sortable" id="dashTh1" onclick="sortDashLocTable(1)" title="Sortieren">Adresse</th>
             <th class="sortable" id="dashTh2" onclick="sortDashLocTable(2)" title="Sortieren">Mitarbeiter</th>
-            <th class="sortable" id="dashTh3" onclick="sortDashLocTable(3)" title="Sortieren, laufender Monat">Erfasste Tage</th>
-            <th class="sortable" id="dashTh4" onclick="sortDashLocTable(4)" title="Sortieren">Tickets</th>
-            <th class="sortable" id="dashTh5" onclick="sortDashLocTable(5)" title="Sortieren">Umsatz</th>
+            <th class="sortable" id="dashTh3" onclick="sortDashLocTable(3)" title="Sortieren">Tickets</th>
+            <th class="sortable" id="dashTh4" onclick="sortDashLocTable(4)" title="Sortieren">Umsatz</th>
           </tr></thead>
           <tbody id="dashLocTableBody"></tbody>
         </table>
@@ -428,7 +427,7 @@
     let currentLocationsData = []; let currentLocationsSheetName = '';
     let currentRowIndex = null; let sortCol = -1; let sortAsc = true;
 
-    let currentDashLocations = []; let dashSortCol = 4; let dashSortAsc = false;
+    let currentDashLocations = []; let dashSortCol = 3; let dashSortAsc = false;
 
     let currentTagesdaten = null;
     
@@ -606,27 +605,12 @@
               document.getElementById('dashKpiRevenue').innerText = eurFormatter.format(response.totalRevenue || 0);
               document.getElementById('rankingsPeriodLabel').innerText = response.sheetName || '–';
               renderDashCharts(response);
-              loadDashCoverage(baseDatum);
           } else { alert("Fehler: " + response.message); }
         }).withFailureHandler(function(error) {
           document.getElementById('loadingDash').style.display = 'none'; alert("Fehler: " + error.message);
         }).getDashboardStats(start, end, baseDatum);
     }
 
-    function loadDashCoverage(baseDatum) {
-      google.script.run.withSuccessHandler(function(response) {
-          if(!response.success) return;
-          const byName = {};
-          response.data.forEach(d => { byName[d.name] = d; });
-          currentDashLocations.forEach(l => {
-            const cov = byName[l.name];
-            l.coverageRecorded = cov ? cov.recordedDays : null;
-            l.coverageTotal = cov ? cov.totalDays : null;
-          });
-          renderDashLocTable();
-        }).getDataCompleteness(baseDatum);
-    }
-    
     function renderDashCharts(data) {
       const staffLabels = data.staff.map(s => s.name); const staffValues = data.staff.map(s => s.count);
       document.getElementById('staffChartWrapper').style.height = Math.max(300, staffLabels.length * 35 + 80) + 'px';
@@ -649,7 +633,7 @@
     }
 
     function sortDashLocTable(col) {
-      if (dashSortCol === col) { dashSortAsc = !dashSortAsc; } else { dashSortCol = col; dashSortAsc = (col !== 3 && col !== 4 && col !== 5); }
+      if (dashSortCol === col) { dashSortAsc = !dashSortAsc; } else { dashSortCol = col; dashSortAsc = (col !== 3 && col !== 4); }
       renderDashLocTable();
     }
 
@@ -659,8 +643,7 @@
         if (dashSortCol === 0) { valA = a.name.toLowerCase(); valB = b.name.toLowerCase(); }
         else if (dashSortCol === 1) { valA = (a.address || '').toLowerCase(); valB = (b.address || '').toLowerCase(); }
         else if (dashSortCol === 2) { valA = (a.staff || '').toLowerCase(); valB = (b.staff || '').toLowerCase(); }
-        else if (dashSortCol === 3) { valA = a.coverageRecorded != null ? a.coverageRecorded : -1; valB = b.coverageRecorded != null ? b.coverageRecorded : -1; }
-        else if (dashSortCol === 4) { valA = a.count; valB = b.count; }
+        else if (dashSortCol === 3) { valA = a.count; valB = b.count; }
         else { valA = a.revenue; valB = b.revenue; }
         if (valA < valB) return dashSortAsc ? -1 : 1;
         if (valA > valB) return dashSortAsc ? 1 : -1;
@@ -669,17 +652,12 @@
 
       let html = '';
       currentDashLocations.forEach(l => {
-        let coverageCell = '-';
-        if (l.coverageTotal != null) {
-          const incomplete = l.coverageRecorded < l.coverageTotal;
-          coverageCell = `<span style="${incomplete ? 'color:#ea580c; font-weight:600;' : ''}">${l.coverageRecorded} / ${l.coverageTotal} Tage</span>`;
-        }
-        html += `<tr><td>${l.name}</td><td>${l.address || '-'}</td><td>${l.staff || 'Ohne Zuweisung'}</td><td>${coverageCell}</td><td>${l.count}</td><td>${eurFormatter.format(l.revenue || 0)}</td></tr>`;
+        html += `<tr><td>${l.name}</td><td>${l.address || '-'}</td><td>${l.staff || 'Ohne Zuweisung'}</td><td>${l.count}</td><td>${eurFormatter.format(l.revenue || 0)}</td></tr>`;
       });
-      document.getElementById('dashLocTableBody').innerHTML = html || '<tr><td colspan="6" style="text-align:center; color:#6b7280;">Keine Daten im gewählten Zeitraum.</td></tr>';
+      document.getElementById('dashLocTableBody').innerHTML = html || '<tr><td colspan="5" style="text-align:center; color:#6b7280;">Keine Daten im gewählten Zeitraum.</td></tr>';
 
-      const labels = ['Standort', 'Adresse', 'Mitarbeiter', 'Erfasste Tage', 'Tickets', 'Umsatz'];
-      for (let i = 0; i < 6; i++) {
+      const labels = ['Standort', 'Adresse', 'Mitarbeiter', 'Tickets', 'Umsatz'];
+      for (let i = 0; i < 5; i++) {
         document.getElementById('dashTh' + i).innerText = labels[i] + (dashSortCol === i ? (dashSortAsc ? ' 🔼' : ' 🔽') : '');
       }
     }
