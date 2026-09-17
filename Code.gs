@@ -202,6 +202,130 @@ function getDashboardStats(startDateStr, endDateStr, baseDateStr) {
   }
 }
 
+function computeHalfTrend(series) {
+  var len = series.length;
+  var half = Math.floor(len / 2);
+  if (half < 1) return { firstAvg: 0, secondAvg: 0, percent: null };
+
+  var firstHalf = series.slice(0, half);
+  var secondHalf = series.slice(len - half);
+
+  var firstAvg = firstHalf.reduce(function(a, b) { return a + b; }, 0) / firstHalf.length;
+  var secondAvg = secondHalf.reduce(function(a, b) { return a + b; }, 0) / secondHalf.length;
+
+  var percent;
+  if (firstAvg > 0) {
+    percent = ((secondAvg - firstAvg) / firstAvg) * 100;
+  } else if (secondAvg > 0) {
+    percent = 100;
+  } else {
+    percent = null;
+  }
+
+  return { firstAvg: firstAvg, secondAvg: secondAvg, percent: percent };
+}
+
+function getTrendData(monthsCountStr) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheets = ss.getSheets();
+    var monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+    var monthSheets = [];
+    for (var s = 0; s < sheets.length; s++) {
+      var nameParts = sheets[s].getName().split(" ");
+      if (nameParts.length < 2) continue;
+      var mIdx = monthNames.indexOf(nameParts[0]);
+      var y = parseInt(nameParts[1], 10);
+      if (mIdx === -1 || isNaN(y)) continue;
+      monthSheets.push({ sheet: sheets[s], year: y, month: mIdx, sortKey: y * 12 + mIdx });
+    }
+    monthSheets.sort(function(a, b) { return a.sortKey - b.sortKey; });
+
+    var n = parseInt(monthsCountStr, 10) || 6;
+    var selected = monthSheets.slice(Math.max(0, monthSheets.length - n));
+
+    if (selected.length < 2) {
+      return { success: false, message: "Es werden mindestens 2 Monatsblätter für eine Trendanalyse benötigt." };
+    }
+
+    var monthLabels = selected.map(function(m) { return monthNames[m.month] + " " + m.year; });
+
+    var locMap = {};
+    var staffMap = {};
+
+    for (var mi = 0; mi < selected.length; mi++) {
+      var startObj = new Date(selected[mi].year, selected[mi].month, 1);
+      var endObj = new Date(selected[mi].year, selected[mi].month + 1, 0);
+      endObj.setHours(23, 59, 59, 999);
+
+      var monthStats = aggregatePeriod(startObj, endObj, [selected[mi].sheet], monthNames);
+
+      Object.keys(monthStats.locs).forEach(function(key) {
+        if (!locMap[key]) {
+          locMap[key] = {
+            address: monthStats.locs[key].address,
+            staffSet: {},
+            ticketSeries: new Array(selected.length).fill(0),
+            revenueSeries: new Array(selected.length).fill(0)
+          };
+        }
+        locMap[key].ticketSeries[mi] = monthStats.locs[key].count;
+        locMap[key].revenueSeries[mi] = monthStats.locs[key].revenue;
+        Object.keys(monthStats.locs[key].staffSet).forEach(function(st) { locMap[key].staffSet[st] = true; });
+      });
+
+      Object.keys(monthStats.staff).forEach(function(key) {
+        if (!staffMap[key]) {
+          staffMap[key] = {
+            ticketSeries: new Array(selected.length).fill(0),
+            revenueSeries: new Array(selected.length).fill(0)
+          };
+        }
+        staffMap[key].ticketSeries[mi] = monthStats.staff[key].count;
+        staffMap[key].revenueSeries[mi] = monthStats.staff[key].revenue;
+      });
+    }
+
+    var locations = Object.keys(locMap).map(function(key) {
+      var l = locMap[key];
+      var ticketTrend = computeHalfTrend(l.ticketSeries);
+      var revenueTrend = computeHalfTrend(l.revenueSeries);
+      return {
+        name: key,
+        address: l.address,
+        staff: Object.keys(l.staffSet).join(", "),
+        ticketSeries: l.ticketSeries,
+        revenueSeries: l.revenueSeries,
+        ticketFirstAvg: ticketTrend.firstAvg,
+        ticketSecondAvg: ticketTrend.secondAvg,
+        ticketTrendPercent: ticketTrend.percent,
+        revenueTrendPercent: revenueTrend.percent
+      };
+    });
+
+    var staffList = Object.keys(staffMap).map(function(key) {
+      var st = staffMap[key];
+      var ticketTrend = computeHalfTrend(st.ticketSeries);
+      var revenueTrend = computeHalfTrend(st.revenueSeries);
+      return {
+        name: key,
+        ticketSeries: st.ticketSeries,
+        revenueSeries: st.revenueSeries,
+        ticketFirstAvg: ticketTrend.firstAvg,
+        ticketSecondAvg: ticketTrend.secondAvg,
+        ticketTrendPercent: ticketTrend.percent,
+        revenueTrendPercent: revenueTrend.percent
+      };
+    });
+
+    return { success: true, months: monthLabels, locations: locations, staff: staffList };
+
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
 function processPastedData(dateString, parsedData) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();

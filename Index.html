@@ -190,6 +190,7 @@
     <div class="tabs">
       <div class="tab active" onclick="switchTab('dashboard')">Dashboard</div>
       <div class="tab" onclick="switchTab('rankings')">📊 Rankings</div>
+      <div class="tab" onclick="switchTab('trend')">📈 Trend</div>
       <div class="tab" onclick="switchTab('bericht')">📄 Bericht (PDF)</div>
       <div class="tab" onclick="switchTab('eingabe')">Dateneingabe</div>
       <div class="tab" onclick="switchTab('tagesdaten')">🗓️ Tagesdaten</div>
@@ -264,6 +265,69 @@
           <div class="chart-wrapper" id="locChartWrapper">
              <canvas id="locationChart"></canvas>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TREND TAB -->
+    <div id="trend-tab" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <p style="margin:0 0 0.75rem 0;">Entwicklung von Standorten und Mitarbeitern über mehrere Monate. Verglichen wird die 1. Hälfte mit der 2. Hälfte des gewählten Zeitraums, um zu erkennen, wer sich verbessert oder verschlechtert.</p>
+          <div class="form-group" style="margin-bottom:0; max-width: 220px;">
+            <label>Zeitraum:</label>
+            <select id="trendMonths">
+              <option value="3">Letzte 3 Monate</option>
+              <option value="6" selected>Letzte 6 Monate</option>
+              <option value="12">Letzte 12 Monate</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="loadTrend()" class="btn-success filter-btn">🔄 Laden</button>
+      </div>
+
+      <div id="trendMessage" class="message-box"></div>
+      <div id="trendLoader" style="text-align:center; padding: 2rem 0; font-size: 1.1rem;">⏳ Lade Trendanalyse...</div>
+
+      <div id="trendContent" style="display:none;">
+        <p style="margin:0 0 1.5rem 0; font-weight:600; color:#374151;">Zeitraum: <span id="trendPeriodLabel">–</span></p>
+
+        <div class="chart-container" style="margin-bottom: 2rem;">
+          <div class="chart-title">Mitarbeiter-Entwicklung (Tickets pro Monat)</div>
+          <div class="chart-wrapper" style="height: 350px;">
+            <canvas id="trendStaffChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container" style="margin-bottom: 2rem;">
+          <div class="chart-title">Mitarbeiter-Trend</div>
+          <table class="data-table" id="trendStaffTable">
+            <thead><tr>
+              <th class="sortable" id="trendStaffTh0" onclick="sortTrendTable('staff', 0)" title="Sortieren">Mitarbeiter</th>
+              <th class="sortable" id="trendStaffTh1" onclick="sortTrendTable('staff', 1)" title="Sortieren">Verlauf (Tickets)</th>
+              <th class="sortable" id="trendStaffTh2" onclick="sortTrendTable('staff', 2)" title="Sortieren">Ø 1. Hälfte</th>
+              <th class="sortable" id="trendStaffTh3" onclick="sortTrendTable('staff', 3)" title="Sortieren">Ø 2. Hälfte</th>
+              <th class="sortable" id="trendStaffTh4" onclick="sortTrendTable('staff', 4)" title="Sortieren">Trend Tickets</th>
+              <th class="sortable" id="trendStaffTh5" onclick="sortTrendTable('staff', 5)" title="Sortieren">Trend Umsatz</th>
+            </tr></thead>
+            <tbody id="trendStaffTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-title">Standort-Trend</div>
+          <table class="data-table" id="trendLocTable">
+            <thead><tr>
+              <th class="sortable" id="trendLocTh0" onclick="sortTrendTable('loc', 0)" title="Sortieren">Standort</th>
+              <th class="sortable" id="trendLocTh1" onclick="sortTrendTable('loc', 1)" title="Sortieren">Mitarbeiter</th>
+              <th class="sortable" id="trendLocTh2" onclick="sortTrendTable('loc', 2)" title="Sortieren">Verlauf (Tickets)</th>
+              <th class="sortable" id="trendLocTh3" onclick="sortTrendTable('loc', 3)" title="Sortieren">Ø 1. Hälfte</th>
+              <th class="sortable" id="trendLocTh4" onclick="sortTrendTable('loc', 4)" title="Sortieren">Ø 2. Hälfte</th>
+              <th class="sortable" id="trendLocTh5" onclick="sortTrendTable('loc', 5)" title="Sortieren">Trend Tickets</th>
+              <th class="sortable" id="trendLocTh6" onclick="sortTrendTable('loc', 6)" title="Sortieren">Trend Umsatz</th>
+            </tr></thead>
+            <tbody id="trendLocTableBody"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -430,6 +494,30 @@
     let currentDashLocations = []; let dashSortCol = 3; let dashSortAsc = false;
 
     let currentTagesdaten = null;
+
+    let currentTrendData = null; let trendChartInstance = null;
+    let trendStaffSortCol = 4; let trendStaffSortAsc = false;
+    let trendLocSortCol = 5; let trendLocSortAsc = false;
+
+    const trendStaffColumns = [
+      { key: 'name', type: 'text' },
+      { key: 'ticketSeries', type: 'series' },
+      { key: 'ticketFirstAvg', type: 'number' },
+      { key: 'ticketSecondAvg', type: 'number' },
+      { key: 'ticketTrendPercent', type: 'trend' },
+      { key: 'revenueTrendPercent', type: 'trend' }
+    ];
+    const trendLocColumns = [
+      { key: 'name', type: 'text' },
+      { key: 'staff', type: 'text' },
+      { key: 'ticketSeries', type: 'series' },
+      { key: 'ticketFirstAvg', type: 'number' },
+      { key: 'ticketSecondAvg', type: 'number' },
+      { key: 'ticketTrendPercent', type: 'trend' },
+      { key: 'revenueTrendPercent', type: 'trend' }
+    ];
+    const trendStaffLabels = ['Mitarbeiter', 'Verlauf (Tickets)', 'Ø 1. Hälfte', 'Ø 2. Hälfte', 'Trend Tickets', 'Trend Umsatz'];
+    const trendLocLabels = ['Standort', 'Mitarbeiter', 'Verlauf (Tickets)', 'Ø 1. Hälfte', 'Ø 2. Hälfte', 'Trend Tickets', 'Trend Umsatz'];
     
     const eurFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
@@ -443,7 +531,7 @@
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-      const tabMap = {'dashboard': 0, 'rankings': 1, 'bericht': 2, 'eingabe': 3, 'tagesdaten': 4, 'standorte': 5};
+      const tabMap = {'dashboard': 0, 'rankings': 1, 'trend': 2, 'bericht': 3, 'eingabe': 4, 'tagesdaten': 5, 'standorte': 6};
       document.querySelectorAll('.tab')[tabMap[tabName]].classList.add('active');
       document.getElementById(tabName + '-tab').classList.add('active');
 
@@ -452,6 +540,8 @@
       } else if (tabName === 'rankings') {
           if(staffChartInstance) staffChartInstance.resize();
           if(locChartInstance) locChartInstance.resize();
+      } else if (tabName === 'trend') {
+          loadTrend();
       } else if (tabName === 'tagesdaten') {
           loadTagesdaten();
       } else if (tabName === 'standorte') {
@@ -831,6 +921,110 @@
           inputEl.classList.add('error');
           showMsg('tagesdatenMessage', 'Fehler: ' + error.message, 'error');
         }).updateDailyValue({ sheetName: currentTagesdaten.sheetName, rowIndex: rowIndex, day: day, value: value });
+    }
+
+    function loadTrend() {
+      const months = document.getElementById('trendMonths').value;
+
+      document.getElementById('trendLoader').style.display = 'block';
+      document.getElementById('trendContent').style.display = 'none';
+
+      google.script.run.withSuccessHandler(function(response) {
+          document.getElementById('trendLoader').style.display = 'none';
+          if (response.success) {
+            currentTrendData = response;
+            document.getElementById('trendPeriodLabel').innerText = response.months[0] + ' – ' + response.months[response.months.length - 1];
+            renderTrendChart();
+            renderTrendTable('staff');
+            renderTrendTable('loc');
+            document.getElementById('trendContent').style.display = 'block';
+          } else {
+            showMsg('trendMessage', response.message, 'error');
+          }
+        }).withFailureHandler(function(error) {
+          document.getElementById('trendLoader').style.display = 'none';
+          showMsg('trendMessage', 'Fehler: ' + error.message, 'error');
+        }).getTrendData(months);
+    }
+
+    function renderTrendChart() {
+      const data = currentTrendData;
+      const palette = ['#003366', '#00a651', '#ea580c', '#7c3aed', '#dc2626', '#0891b2', '#ca8a04', '#4b5563', '#db2777', '#059669'];
+
+      const datasets = data.staff.map((s, idx) => ({
+        label: s.name,
+        data: s.ticketSeries,
+        borderColor: palette[idx % palette.length],
+        backgroundColor: palette[idx % palette.length],
+        tension: 0.3,
+        fill: false
+      }));
+
+      if (trendChartInstance) trendChartInstance.destroy();
+      trendChartInstance = new Chart(document.getElementById('trendStaffChart').getContext('2d'), {
+        type: 'line',
+        data: { labels: data.months, datasets: datasets },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+      });
+    }
+
+    function formatTrendPercent(p) {
+      if (p === null || p === undefined) return '-';
+      const rounded = Math.round(p * 10) / 10;
+      const sign = rounded > 0 ? '+' : '';
+      let color = '#6b7280';
+      if (rounded > 5) color = '#059669';
+      else if (rounded < -5) color = '#dc2626';
+      return `<span style="color:${color}; font-weight:700;">${sign}${rounded.toFixed(1)}%</span>`;
+    }
+
+    function sortTrendTable(type, col) {
+      if (type === 'staff') {
+        if (trendStaffSortCol === col) { trendStaffSortAsc = !trendStaffSortAsc; } else { trendStaffSortCol = col; trendStaffSortAsc = (col === 0); }
+      } else {
+        if (trendLocSortCol === col) { trendLocSortAsc = !trendLocSortAsc; } else { trendLocSortCol = col; trendLocSortAsc = (col === 0 || col === 1); }
+      }
+      renderTrendTable(type);
+    }
+
+    function renderTrendTable(type) {
+      const isStaff = (type === 'staff');
+      const rows = (isStaff ? currentTrendData.staff : currentTrendData.locations).slice();
+      const columns = isStaff ? trendStaffColumns : trendLocColumns;
+      const labels = isStaff ? trendStaffLabels : trendLocLabels;
+      const sortCol = isStaff ? trendStaffSortCol : trendLocSortCol;
+      const sortAsc = isStaff ? trendStaffSortAsc : trendLocSortAsc;
+      const thPrefix = isStaff ? 'trendStaffTh' : 'trendLocTh';
+      const bodyId = isStaff ? 'trendStaffTableBody' : 'trendLocTableBody';
+
+      const sortColDef = columns[sortCol];
+      rows.sort((a, b) => {
+        let valA = a[sortColDef.key], valB = b[sortColDef.key];
+        if (sortColDef.type === 'series') { valA = a.ticketFirstAvg + a.ticketSecondAvg; valB = b.ticketFirstAvg + b.ticketSecondAvg; }
+        else if (sortColDef.type === 'text') { valA = (valA || '').toLowerCase(); valB = (valB || '').toLowerCase(); }
+        else if (sortColDef.type === 'trend') { valA = (valA === null || valA === undefined) ? -Infinity : valA; valB = (valB === null || valB === undefined) ? -Infinity : valB; }
+        if (valA < valB) return sortAsc ? -1 : 1;
+        if (valA > valB) return sortAsc ? 1 : -1;
+        return 0;
+      });
+
+      let html = '';
+      rows.forEach(r => {
+        html += '<tr>';
+        columns.forEach(c => {
+          const val = r[c.key];
+          if (c.type === 'series') html += `<td style="font-size:0.85rem; color:#6b7280; white-space:nowrap;">${r.ticketSeries.join(', ')}</td>`;
+          else if (c.type === 'number') html += `<td>${val != null ? val.toFixed(1) : '-'}</td>`;
+          else if (c.type === 'trend') html += `<td>${formatTrendPercent(val)}</td>`;
+          else html += `<td>${val || (c.key === 'staff' ? 'Ohne Zuweisung' : '-')}</td>`;
+        });
+        html += '</tr>';
+      });
+      document.getElementById(bodyId).innerHTML = html || `<tr><td colspan="${columns.length}" style="text-align:center; color:#6b7280;">Keine Daten.</td></tr>`;
+
+      labels.forEach((label, i) => {
+        document.getElementById(thPrefix + i).innerText = label + (sortCol === i ? (sortAsc ? ' 🔼' : ' 🔽') : '');
+      });
     }
 
     function loadLocationsList() {
