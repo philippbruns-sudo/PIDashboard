@@ -283,7 +283,10 @@
             </select>
           </div>
         </div>
-        <button onclick="loadTrend()" class="btn-success filter-btn">🔄 Laden</button>
+        <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+          <button onclick="loadTrend()" class="btn-success filter-btn">🔄 Laden</button>
+          <button onclick="downloadTrendPDF()" id="trendPdfBtn" class="filter-btn" style="background: var(--primary); color: white;" disabled>💾 Als PDF speichern</button>
+        </div>
       </div>
 
       <div id="trendMessage" class="message-box"></div>
@@ -308,7 +311,6 @@
               <th class="sortable" id="trendStaffTh2" onclick="sortTrendTable('staff', 2)" title="Sortieren">Ø 1. Hälfte</th>
               <th class="sortable" id="trendStaffTh3" onclick="sortTrendTable('staff', 3)" title="Sortieren">Ø 2. Hälfte</th>
               <th class="sortable" id="trendStaffTh4" onclick="sortTrendTable('staff', 4)" title="Sortieren">Trend Tickets</th>
-              <th class="sortable" id="trendStaffTh5" onclick="sortTrendTable('staff', 5)" title="Sortieren">Trend Umsatz</th>
             </tr></thead>
             <tbody id="trendStaffTableBody"></tbody>
           </table>
@@ -324,7 +326,6 @@
               <th class="sortable" id="trendLocTh3" onclick="sortTrendTable('loc', 3)" title="Sortieren">Ø 1. Hälfte</th>
               <th class="sortable" id="trendLocTh4" onclick="sortTrendTable('loc', 4)" title="Sortieren">Ø 2. Hälfte</th>
               <th class="sortable" id="trendLocTh5" onclick="sortTrendTable('loc', 5)" title="Sortieren">Trend Tickets</th>
-              <th class="sortable" id="trendLocTh6" onclick="sortTrendTable('loc', 6)" title="Sortieren">Trend Umsatz</th>
             </tr></thead>
             <tbody id="trendLocTableBody"></tbody>
           </table>
@@ -504,8 +505,7 @@
       { key: 'ticketSeries', type: 'series' },
       { key: 'ticketFirstAvg', type: 'number' },
       { key: 'ticketSecondAvg', type: 'number' },
-      { key: 'ticketTrendPercent', type: 'trend' },
-      { key: 'revenueTrendPercent', type: 'trend' }
+      { key: 'ticketTrendPercent', type: 'trend' }
     ];
     const trendLocColumns = [
       { key: 'name', type: 'text' },
@@ -513,11 +513,10 @@
       { key: 'ticketSeries', type: 'series' },
       { key: 'ticketFirstAvg', type: 'number' },
       { key: 'ticketSecondAvg', type: 'number' },
-      { key: 'ticketTrendPercent', type: 'trend' },
-      { key: 'revenueTrendPercent', type: 'trend' }
+      { key: 'ticketTrendPercent', type: 'trend' }
     ];
-    const trendStaffLabels = ['Mitarbeiter', 'Verlauf (Tickets)', 'Ø 1. Hälfte', 'Ø 2. Hälfte', 'Trend Tickets', 'Trend Umsatz'];
-    const trendLocLabels = ['Standort', 'Mitarbeiter', 'Verlauf (Tickets)', 'Ø 1. Hälfte', 'Ø 2. Hälfte', 'Trend Tickets', 'Trend Umsatz'];
+    const trendStaffLabels = ['Mitarbeiter', 'Verlauf (Tickets)', 'Ø 1. Hälfte', 'Ø 2. Hälfte', 'Trend Tickets'];
+    const trendLocLabels = ['Standort', 'Mitarbeiter', 'Verlauf (Tickets)', 'Ø 1. Hälfte', 'Ø 2. Hälfte', 'Trend Tickets'];
     
     const eurFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
@@ -928,6 +927,7 @@
 
       document.getElementById('trendLoader').style.display = 'block';
       document.getElementById('trendContent').style.display = 'none';
+      document.getElementById('trendPdfBtn').disabled = true;
 
       google.script.run.withSuccessHandler(function(response) {
           document.getElementById('trendLoader').style.display = 'none';
@@ -938,6 +938,7 @@
             renderTrendTable('staff');
             renderTrendTable('loc');
             document.getElementById('trendContent').style.display = 'block';
+            document.getElementById('trendPdfBtn').disabled = false;
           } else {
             showMsg('trendMessage', response.message, 'error');
           }
@@ -1024,6 +1025,86 @@
 
       labels.forEach((label, i) => {
         document.getElementById(thPrefix + i).innerText = label + (sortCol === i ? (sortAsc ? ' 🔼' : ' 🔽') : '');
+      });
+    }
+
+    function downloadTrendPDF() {
+      if (!currentTrendData) return;
+
+      const btn = document.getElementById('trendPdfBtn');
+      btn.disabled = true;
+      const originalLabel = btn.innerText;
+      btn.innerText = '⏳ Erstelle PDF...';
+
+      const periodLabel = currentTrendData.months[0] + ' – ' + currentTrendData.months[currentTrendData.months.length - 1];
+      const chartImg = trendChartInstance ? trendChartInstance.toBase64Image() : '';
+
+      const sortByTrendDesc = (a, b) => {
+        const va = (a.ticketTrendPercent === null || a.ticketTrendPercent === undefined) ? -Infinity : a.ticketTrendPercent;
+        const vb = (b.ticketTrendPercent === null || b.ticketTrendPercent === undefined) ? -Infinity : b.ticketTrendPercent;
+        return vb - va;
+      };
+
+      const staffRows = currentTrendData.staff.slice().sort(sortByTrendDesc)
+        .map(s => `<tr><td>${s.name}</td><td>${s.ticketSeries.join(', ')}</td><td>${s.ticketFirstAvg.toFixed(1)}</td><td>${s.ticketSecondAvg.toFixed(1)}</td><td>${formatTrendPercent(s.ticketTrendPercent)}</td></tr>`)
+        .join('');
+
+      const locRows = currentTrendData.locations.slice().sort(sortByTrendDesc)
+        .map(l => `<tr><td>${l.name}</td><td>${l.staff || 'Ohne Zuweisung'}</td><td>${l.ticketSeries.join(', ')}</td><td>${l.ticketFirstAvg.toFixed(1)}</td><td>${l.ticketSecondAvg.toFixed(1)}</td><td>${formatTrendPercent(l.ticketTrendPercent)}</td></tr>`)
+        .join('');
+
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.innerHTML = `
+        <div class="report-page">
+          <div class="rep-header">
+            <img src="https://parkinnovation.de/wp-content/uploads/2023/11/PI-Logo_220.png" alt="Logo">
+            <div class="rep-title">
+              <h1>Trendanalyse</h1>
+              <p>${periodLabel}</p>
+            </div>
+          </div>
+          ${chartImg ? `<div class="rep-chart-box" style="margin-bottom: 20px;">
+            <h4 style="text-align:center; margin-top:0; color:#374151;">Mitarbeiter-Entwicklung (Tickets pro Monat)</h4>
+            <img src="${chartImg}" style="width:100%;">
+          </div>` : ''}
+          <div class="rep-table-box">
+            <h3>Mitarbeiter-Trend</h3>
+            <table class="rep-table">
+              <thead><tr><th>Mitarbeiter</th><th>Verlauf (Tickets)</th><th>Ø 1. Hälfte</th><th>Ø 2. Hälfte</th><th>Trend</th></tr></thead>
+              <tbody>${staffRows}</tbody>
+            </table>
+          </div>
+          <div class="rep-table-box" style="margin-top: 24px;">
+            <h3>Standort-Trend</h3>
+            <table class="rep-table">
+              <thead><tr><th>Standort</th><th>Mitarbeiter</th><th>Verlauf (Tickets)</th><th>Ø 1. Hälfte</th><th>Ø 2. Hälfte</th><th>Trend</th></tr></thead>
+              <tbody>${locRows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(container);
+
+      const opt = {
+        margin: 0,
+        filename: `PCN_Trendanalyse_${periodLabel.replace(/\s/g, '').replace(/–/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(container.querySelector('.report-page')).save().then(() => {
+        document.body.removeChild(container);
+        btn.disabled = false;
+        btn.innerText = originalLabel;
+      }).catch(() => {
+        document.body.removeChild(container);
+        btn.disabled = false;
+        btn.innerText = originalLabel;
+        showMsg('trendMessage', 'PDF konnte nicht erstellt werden.', 'error');
       });
     }
 
