@@ -569,6 +569,8 @@ function getDailyData(monthStr) {
       rows.push({
         rowIndex: i + 1,
         standort: standort,
+        strasse: data[i][2] || "",
+        hausnummer: data[i][3] || "",
         stadt: data[i][4] || "",
         staff: data[i][5] || "",
         days: days

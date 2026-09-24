@@ -142,8 +142,10 @@
     .daily-table th { background: #e5e7eb; color: #374151; position: sticky; top: 0; z-index: 2; }
     .daily-table td.daily-loc-cell, .daily-table th.daily-loc-th { position: sticky; background: #ffffff; z-index: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; }
     .daily-table th.daily-loc-th { z-index: 3; background: #e5e7eb; }
-    .daily-table .daily-loc-col-1 { left: 0; width: 160px; max-width: 160px; }
-    .daily-table .daily-loc-col-2 { left: 160px; width: 130px; max-width: 130px; }
+    .daily-table .daily-loc-col-1 { left: 0; width: 210px; max-width: 210px; white-space: normal; }
+    .daily-table .daily-loc-col-2 { left: 210px; width: 130px; max-width: 130px; }
+    .daily-table .daily-loc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .daily-table .daily-loc-address { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; font-size: 0.78rem; color: #6b7280; }
     .daily-table td.daily-total-cell { font-weight: 700; background: #f9fafb; }
     .daily-table input.daily-input { height: auto; width: 40px; box-sizing: border-box; text-align: center; border: 1px solid #d1d5db; border-radius: 4px; padding: 4px 2px; font-size: 0.9rem; color: var(--text); background: #ffffff; font-family: inherit; }
     .daily-table input.daily-input:focus { border-color: var(--primary); background: #ffffff; outline: none; box-shadow: none; }
@@ -938,8 +940,12 @@
         row.days.forEach(v => { const n = parseInt(v, 10); if (!isNaN(n)) sum += n; });
 
         const locLabel = row.standort + (row.stadt ? ' (' + row.stadt + ')' : '');
+        const addressLabel = (row.strasse + ' ' + row.hausnummer).trim();
         const staffLabel = row.staff || 'Ohne Zuweisung';
-        html += `<tr><td class="daily-loc-cell daily-loc-col-1" title="${locLabel}"><strong>${locLabel}</strong></td>`;
+        html += `<tr><td class="daily-loc-cell daily-loc-col-1" title="${locLabel}${addressLabel ? ' – ' + addressLabel : ''}">`;
+        html += `<div class="daily-loc-name"><strong>${locLabel}</strong></div>`;
+        html += `<div class="daily-loc-address">${addressLabel || '-'}</div>`;
+        html += `</td>`;
         html += `<td class="daily-loc-cell daily-loc-col-2" title="${staffLabel}">${staffLabel}</td>`;
         row.days.forEach((v, dIdx) => {
           const day = dIdx + 1;
