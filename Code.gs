@@ -326,18 +326,133 @@ function getTrendData(monthsCountStr) {
   }
 }
 
-function processPastedData(dateString, parsedData) {
+// Finds the chronologically most recent "MonthName Year" sheet. Used as the
+// template for a brand-new month instead of ss.getActiveSheet(), which
+// depends on whatever tab a human happened to have open and can silently
+// clone a stale/incomplete location list.
+function findLatestMonthSheet(ss, monthNames) {
+  var sheets = ss.getSheets();
+  var best = null;
+  var bestKey = -1;
+  for (var i = 0; i < sheets.length; i++) {
+    var parts = sheets[i].getName().split(" ");
+    if (parts.length < 2) continue;
+    var mIdx = monthNames.indexOf(parts[0]);
+    var y = parseInt(parts[1], 10);
+    if (mIdx === -1 || isNaN(y)) continue;
+    var key = y * 12 + mIdx;
+    if (key > bestKey) { bestKey = key; best = sheets[i]; }
+  }
+  return best;
+}
+
+// Shared by previewPastedData and commitPastedData so the two can never
+// disagree about what counts as a match. Returns the 0-indexed row in
+// `data`, or -1 if nothing matches.
+function findMatchingRowIndex(data, strasseInput, ortInput) {
+  var inputStrasseNorm = normalizeStr(strasseInput);
+  var inputOrtNorm = normalizeStr(ortInput);
+
+  for (var r = 0; r < data.length; r++) {
+    var strasseSheet = data[r][2] || "";
+    var hnrSheet = data[r][3] || "";
+    var stadtSheet = data[r][4] || "";
+
+    var sheetStrasseFull = normalizeStr(strasseSheet.toString() + " " + hnrSheet.toString());
+    var sheetStrasseJust = normalizeStr(strasseSheet.toString());
+    var sheetOrtNorm = normalizeStr(stadtSheet.toString());
+
+    var streetMatches = (sheetStrasseFull === inputStrasseNorm ||
+                        (sheetStrasseJust !== "" && inputStrasseNorm.includes(sheetStrasseJust)) ||
+                        (inputStrasseNorm !== "" && sheetStrasseJust.includes(inputStrasseNorm)));
+
+    var cityMatches = false;
+    if (sheetOrtNorm === "" || inputOrtNorm === "") {
+      cityMatches = true;
+    } else if (inputOrtNorm.includes(sheetOrtNorm) || sheetOrtNorm.includes(inputOrtNorm)) {
+      cityMatches = true;
+    }
+
+    if (streetMatches && cityMatches) return r;
+  }
+  return -1;
+}
+
+function splitStrasseOrt(strasseInput, ortInput) {
+  var sName = strasseInput;
+  var sHnr = "";
+  var matchStrasse = strasseInput.match(/(.*?)\s+(\d.*)/);
+  if (matchStrasse) { sName = matchStrasse[1].trim(); sHnr = matchStrasse[2].trim(); }
+  var sStadt = ortInput;
+  var matchOrt = ortInput.match(/^(\d{5})\s+(.*)/);
+  if (matchOrt) { sStadt = matchOrt[2].trim(); }
+  return { name: sName, hnr: sHnr, stadt: sStadt };
+}
+
+// Read-only: reports which pasted rows would NOT match an existing Standort
+// (and would therefore trigger a brand-new row) without writing anything, so
+// the UI can ask for confirmation before any new Standort gets created.
+function previewPastedData(dateString, parsedData) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var dateObj = parseISODate(dateString);
+    if (!dateObj) return { success: false, message: "Ungültiges Datum." };
+
     var monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
     var targetSheetName = monthNames[dateObj.getMonth()] + " " + dateObj.getFullYear();
-    
+
+    var sheet = ss.getSheetByName(targetSheetName);
+    var matchSheet = sheet || findLatestMonthSheet(ss, monthNames) || ss.getSheets()[0];
+    var data = matchSheet ? matchSheet.getDataRange().getValues() : [];
+
+    var unmatched = [];
+    var matchedCount = 0;
+
+    for (var i = 0; i < parsedData.length; i++) {
+      var ortInput = parsedData[i].ort || "";
+      var strasseInput = parsedData[i].strasse || "";
+      var anzahl = parsedData[i].anzahl;
+
+      var rowIndex = findMatchingRowIndex(data, strasseInput, ortInput);
+      if (rowIndex === -1) {
+        var split = splitStrasseOrt(strasseInput, ortInput);
+        unmatched.push({ ort: ortInput, strasse: strasseInput, anzahl: anzahl, proposedName: split.name, proposedHnr: split.hnr, proposedStadt: split.stadt });
+      } else {
+        matchedCount++;
+      }
+    }
+
+    return {
+      success: true,
+      sheetExists: !!sheet,
+      targetSheetName: targetSheetName,
+      totalCount: parsedData.length,
+      matchedCount: matchedCount,
+      unmatched: unmatched
+    };
+
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+// Actually writes the pasted data. Re-runs the same matching logic against
+// the sheet's current state at call time (never trusts a stale preview), so
+// it stays correct even if the sheet changed between preview and commit.
+function commitPastedData(dateString, parsedData) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var dateObj = parseISODate(dateString);
+    if (!dateObj) return { success: false, message: "Ungültiges Datum." };
+
+    var monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+    var targetSheetName = monthNames[dateObj.getMonth()] + " " + dateObj.getFullYear();
+
     var sheet = ss.getSheetByName(targetSheetName);
     var wasCreated = false;
-    
+
     if (!sheet) {
-      var templateSheet = ss.getActiveSheet();
+      var templateSheet = findLatestMonthSheet(ss, monthNames) || ss.getSheets()[0];
       sheet = templateSheet.copyTo(ss);
       sheet.setName(targetSheetName);
       var lastCol = sheet.getLastColumn();
@@ -345,90 +460,57 @@ function processPastedData(dateString, parsedData) {
       if (lastCol >= 11 && lastRow >= 1) { sheet.getRange(1, 11, lastRow, lastCol - 10).clearContent(); }
       wasCreated = true;
     }
-    
+
     ss.setActiveSheet(sheet);
     var data = sheet.getDataRange().getValues();
-    var dayOfMonth = dateObj.getDate(); 
-    var targetColIndex = 10 + dayOfMonth; 
-    
+    var dayOfMonth = dateObj.getDate();
+    var targetColIndex = 10 + dayOfMonth;
+
     var matchCount = 0;
     var newLocCount = 0;
-    
+
     for (var i = 0; i < parsedData.length; i++) {
       var ortInput = parsedData[i].ort || "";
       var strasseInput = parsedData[i].strasse || "";
       var anzahl = parsedData[i].anzahl;
-      
-      var inputStrasseNorm = normalizeStr(strasseInput);
-      var inputOrtNorm = normalizeStr(ortInput);
-      var matchFound = false;
-      
-      for (var r = 0; r < data.length; r++) {
-        var strasseSheet = data[r][2] || ""; 
-        var hnrSheet = data[r][3] || "";     
-        var stadtSheet = data[r][4] || "";
-        
-        var sheetStrasseFull = normalizeStr(strasseSheet.toString() + " " + hnrSheet.toString());
-        var sheetStrasseJust = normalizeStr(strasseSheet.toString());
-        var sheetOrtNorm = normalizeStr(stadtSheet.toString());
-        
-        var streetMatches = (sheetStrasseFull === inputStrasseNorm || 
-                            (sheetStrasseJust !== "" && inputStrasseNorm.includes(sheetStrasseJust)) ||
-                            (inputStrasseNorm !== "" && sheetStrasseJust.includes(inputStrasseNorm)));
-                            
-        var cityMatches = false;
-        if (sheetOrtNorm === "" || inputOrtNorm === "") {
-           cityMatches = true;
-        } else if (inputOrtNorm.includes(sheetOrtNorm) || sheetOrtNorm.includes(inputOrtNorm)) {
-           cityMatches = true;
-        }
-        
-        if (streetMatches && cityMatches) {
-          sheet.getRange(r + 1, targetColIndex).setValue(anzahl);
-          matchCount++;
-          matchFound = true;
-          break; 
-        }
-      }
-      
-      if (!matchFound) {
+
+      var rowIndex = findMatchingRowIndex(data, strasseInput, ortInput);
+
+      if (rowIndex !== -1) {
+        sheet.getRange(rowIndex + 1, targetColIndex).setValue(anzahl);
+        matchCount++;
+      } else {
         var currentLastRow = sheet.getLastRow();
         var newRowIndex = currentLastRow + 1;
-        var sName = strasseInput;
-        var sHnr = "";
-        var matchStrasse = strasseInput.match(/(.*?)\s+(\d.*)/);
-        if (matchStrasse) { sName = matchStrasse[1].trim(); sHnr = matchStrasse[2].trim(); }
-        var sStadt = ortInput;
-        var matchOrt = ortInput.match(/^(\d{5})\s+(.*)/);
-        if (matchOrt) { sStadt = matchOrt[2].trim(); }
-        
-        sheet.getRange(newRowIndex, 1).setValue("NEU");      
-        sheet.getRange(newRowIndex, 3).setValue(sName);      
-        sheet.getRange(newRowIndex, 4).setValue(sHnr);       
-        sheet.getRange(newRowIndex, 5).setValue(sStadt);     
-        sheet.getRange(newRowIndex, 8).setValue("aktive");   
+        var split = splitStrasseOrt(strasseInput, ortInput);
+
+        sheet.getRange(newRowIndex, 1).setValue("NEU");
+        sheet.getRange(newRowIndex, 3).setValue(split.name);
+        sheet.getRange(newRowIndex, 4).setValue(split.hnr);
+        sheet.getRange(newRowIndex, 5).setValue(split.stadt);
+        sheet.getRange(newRowIndex, 8).setValue("aktive");
         sheet.getRange(newRowIndex, targetColIndex).setValue(anzahl);
-        
+
         if (currentLastRow >= 1) {
             var templateRange = sheet.getRange(currentLastRow, 1, 1, sheet.getLastColumn());
             templateRange.copyTo(sheet.getRange(newRowIndex, 1), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
             templateRange.copyTo(sheet.getRange(newRowIndex, 1), SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
         }
-        
+
         var emptyRow = new Array(Math.max(12, targetColIndex)).fill("");
-        emptyRow[0] = "NEU"; emptyRow[2] = sName; emptyRow[3] = sHnr; emptyRow[4] = sStadt;
+        emptyRow[0] = "NEU"; emptyRow[2] = split.name; emptyRow[3] = split.hnr; emptyRow[4] = split.stadt;
         data.push(emptyRow);
-        
+
         matchCount++;
         newLocCount++;
       }
     }
-    
+
     var msg = "🎉 " + matchCount + " Standorte am verarbeitet!";
     if (wasCreated) { msg = "✨ Neues Blatt '" + targetSheetName + "' wurde angelegt! " + msg; }
-    
+
     return {success: true, message: msg, newLocCount: newLocCount};
-    
+
   } catch (e) {
     return {success: false, message: "Fehler: " + e.message};
   }

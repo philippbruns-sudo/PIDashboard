@@ -605,8 +605,65 @@
          return;
       }
 
-      btn.disabled = true; btn.innerText = "⏳ Wird gespeichert...";
+      btn.disabled = true; btn.innerText = "⏳ Prüfe Zuordnung...";
       document.getElementById('previewContainer').style.display = 'none';
+      document.getElementById('previewContainer').innerHTML = '';
+
+      google.script.run.withSuccessHandler(function(preview) {
+          if (!preview.success) {
+            btn.disabled = false; btn.innerText = "🚀 Daten in Zieltabelle eintragen";
+            showMsg('eingabeMessage', preview.message, "error");
+            return;
+          }
+          if (preview.unmatched.length > 0) {
+            btn.disabled = false; btn.innerText = "🚀 Daten in Zieltabelle eintragen";
+            showNewLocationConfirm(datum, parsedData, preview);
+          } else {
+            commitParsedData(datum, parsedData);
+          }
+        }).withFailureHandler(function(error) {
+          btn.disabled = false; btn.innerText = "🚀 Daten in Zieltabelle eintragen";
+          showMsg('eingabeMessage', "Fehler: " + error.message, "error");
+        }).previewPastedData(datum, parsedData);
+    }
+
+    let pendingSubmit = null;
+
+    function showNewLocationConfirm(datum, parsedData, preview) {
+      const rows = preview.unmatched.map(u => `<tr><td>${u.ort || '-'}</td><td>${u.strasse}</td><td>${u.anzahl}</td></tr>`).join('');
+      const html = `
+        <div style="background:#fff7ed; border:2px solid #f59e0b; border-radius:8px; padding:1.5rem;">
+          <h3 style="margin-top:0; color:#b45309;">⚠️ ${preview.unmatched.length} Standort(e) konnten keinem bestehenden Standort zugeordnet werden</h3>
+          <p style="margin-bottom:1rem;">Bitte prüfen: Ist das wirklich neu, oder nur eine abweichende Schreibweise eines bereits vorhandenen Standorts (z.B. andere Abkürzung, Tippfehler, fehlende PLZ)? Im Zweifel lieber abbrechen und die Schreibweise in der Tabelle korrigieren, statt versehentlich einen Duplikat-Standort anzulegen.</p>
+          <div class="grid-preview" style="margin-bottom:1.5rem;">
+            <table class="data-table"><thead><tr><th>Ort</th><th>Straße</th><th>Anzahl</th></tr></thead><tbody>${rows}</tbody></table>
+          </div>
+          <button onclick="confirmNewLocations()" class="btn-success">✅ Ja, als neue Standorte anlegen</button>
+          <button onclick="cancelNewLocations()" class="btn-secondary" style="margin-left:0.5rem;">✖ Abbrechen</button>
+        </div>`;
+      document.getElementById('previewContainer').style.display = 'block';
+      document.getElementById('previewContainer').innerHTML = html;
+      pendingSubmit = { datum: datum, parsedData: parsedData };
+    }
+
+    function confirmNewLocations() {
+      if (!pendingSubmit) return;
+      document.getElementById('previewContainer').style.display = 'none';
+      document.getElementById('previewContainer').innerHTML = '';
+      commitParsedData(pendingSubmit.datum, pendingSubmit.parsedData);
+      pendingSubmit = null;
+    }
+
+    function cancelNewLocations() {
+      document.getElementById('previewContainer').style.display = 'none';
+      document.getElementById('previewContainer').innerHTML = '';
+      pendingSubmit = null;
+      showMsg('eingabeMessage', 'Abgebrochen. Es wurde nichts gespeichert. Bitte die Schreibweise prüfen und erneut versuchen.', 'error');
+    }
+
+    function commitParsedData(datum, parsedData) {
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true; btn.innerText = "⏳ Wird gespeichert...";
 
       google.script.run.withSuccessHandler(function(response) {
           if(response.success) {
@@ -616,12 +673,12 @@
             }
             showMsg('eingabeMessage', response.message, "success");
             mySpreadsheet.setData([['','',''],['','',''],['','','']]);
-            
+
             // NEU: Datum automatisch +1 Tag nach erfolgreichem Upload!
             let currentDatum = new Date(datum);
             currentDatum.setDate(currentDatum.getDate() + 1);
             document.getElementById('datum').valueAsDate = currentDatum;
-            
+
             btn.disabled = false;
             btn.innerText = "🚀 Daten in Zieltabelle eintragen";
           } else {
@@ -631,7 +688,7 @@
         }).withFailureHandler(function(error) {
           btn.disabled = false; btn.innerText = "🚀 Daten in Zieltabelle eintragen";
           showMsg('eingabeMessage', "Fehler: " + error.message, "error");
-        }).processPastedData(datum, parsedData); 
+        }).commitPastedData(datum, parsedData);
     }
 
     function calcDatesForType(type) {
