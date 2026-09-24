@@ -131,7 +131,27 @@
     /* SPREADSHEET EINGABE */
     .spreadsheet-container { margin-bottom: 1.5rem; }
     .jexcel_container { border: 1px solid var(--border); border-radius: 8px; max-width: 100%; overflow-x: auto;}
-    
+
+    /* TAGESDATEN */
+    /* border-collapse:separate (not collapse) because sticky positioning on
+       table cells is unreliable with collapsed borders in some browsers (Safari). */
+    .daily-table { border-collapse: separate; border-spacing: 0; font-size: 0.85rem; white-space: nowrap; width: auto; }
+    .daily-table th, .daily-table td { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 4px 6px; text-align: center; box-sizing: border-box; }
+    .daily-table th { border-top: 1px solid var(--border); }
+    .daily-table th:first-child, .daily-table td:first-child { border-left: 1px solid var(--border); }
+    .daily-table th { background: #e5e7eb; color: #374151; position: sticky; top: 0; z-index: 2; }
+    .daily-table td.daily-loc-cell, .daily-table th.daily-loc-th { position: sticky; background: #ffffff; z-index: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+    .daily-table th.daily-loc-th { z-index: 3; background: #e5e7eb; }
+    .daily-table .daily-loc-col-1 { left: 0; width: 210px; max-width: 210px; white-space: normal; }
+    .daily-table .daily-loc-col-2 { left: 210px; width: 130px; max-width: 130px; }
+    .daily-table .daily-loc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .daily-table .daily-loc-address { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; font-size: 0.78rem; color: #6b7280; }
+    .daily-table td.daily-total-cell { font-weight: 700; background: #f9fafb; }
+    .daily-table input.daily-input { height: auto; width: 40px; box-sizing: border-box; text-align: center; border: 1px solid #d1d5db; border-radius: 4px; padding: 4px 2px; font-size: 0.9rem; color: var(--text); background: #ffffff; font-family: inherit; }
+    .daily-table input.daily-input:focus { border-color: var(--primary); background: #ffffff; outline: none; box-shadow: none; }
+    .daily-table input.daily-input.saved { background: #d1fae5 !important; }
+    .daily-table input.daily-input.error { background: #fee2e2 !important; }
+
     /* BERICHT PREVIEW */
     .report-preview-container { background: #e5e7eb; padding: 2rem; display: flex; justify-content: center; border-radius: 8px; border: 1px solid var(--border); }
     .report-page { width: 210mm; min-height: 297mm; background: white; padding: 15mm; box-shadow: 0 10px 25px rgba(0,0,0,0.1); box-sizing: border-box; font-family: Arial, sans-serif; color: #1f2937; }
@@ -171,8 +191,11 @@
     
     <div class="tabs">
       <div class="tab active" onclick="switchTab('dashboard')">Dashboard</div>
+      <div class="tab" onclick="switchTab('rankings')">📊 Rankings</div>
+      <div class="tab" onclick="switchTab('trend')">📈 Trend</div>
       <div class="tab" onclick="switchTab('bericht')">📄 Bericht (PDF)</div>
       <div class="tab" onclick="switchTab('eingabe')">Dateneingabe</div>
+      <div class="tab" onclick="switchTab('tagesdaten')">🗓️ Tagesdaten</div>
       <div class="tab" onclick="switchTab('standorte')">Standorte</div>
     </div>
     
@@ -213,6 +236,25 @@
       </div>
       
       <div id="loadingDash" style="display:none; text-align:center; margin-bottom: 2rem; font-size: 1.2rem;">⏳ Lade Statistiken aus Google Sheets...</div>
+
+      <div class="chart-container">
+        <div class="chart-title">Standort-Übersicht &amp; Mitarbeiter-Zuweisung (alle Standorte)</div>
+        <table class="data-table" id="dashLocTable">
+          <thead><tr>
+            <th class="sortable" id="dashTh0" onclick="sortDashLocTable(0)" title="Sortieren">Standort</th>
+            <th class="sortable" id="dashTh1" onclick="sortDashLocTable(1)" title="Sortieren">Adresse</th>
+            <th class="sortable" id="dashTh2" onclick="sortDashLocTable(2)" title="Sortieren">Mitarbeiter</th>
+            <th class="sortable" id="dashTh3" onclick="sortDashLocTable(3)" title="Sortieren">Tickets</th>
+            <th class="sortable" id="dashTh4" onclick="sortDashLocTable(4)" title="Sortieren">Umsatz</th>
+          </tr></thead>
+          <tbody id="dashLocTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RANKINGS TAB -->
+    <div id="rankings-tab" class="tab-content">
+      <p>Ranking der Mitarbeiter und Parkplätze für den im Dashboard-Tab gewählten Zeitraum (<span id="rankingsPeriodLabel">–</span>).</p>
       <div class="dashboard-grid">
         <div class="chart-container">
           <div class="chart-title">Mitarbeiter Ranking</div>
@@ -228,7 +270,71 @@
         </div>
       </div>
     </div>
-    
+
+    <!-- TREND TAB -->
+    <div id="trend-tab" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <p style="margin:0 0 0.75rem 0;">Entwicklung von Standorten und Mitarbeitern über mehrere Monate. Verglichen wird die 1. Hälfte mit der 2. Hälfte des gewählten Zeitraums, um zu erkennen, wer sich verbessert oder verschlechtert.</p>
+          <div class="form-group" style="margin-bottom:0; max-width: 220px;">
+            <label>Zeitraum:</label>
+            <select id="trendMonths">
+              <option value="3">Letzte 3 Monate</option>
+              <option value="6" selected>Letzte 6 Monate</option>
+              <option value="12">Letzte 12 Monate</option>
+            </select>
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+          <button onclick="loadTrend()" class="btn-success filter-btn">🔄 Laden</button>
+          <button onclick="downloadTrendPDF()" id="trendPdfBtn" class="filter-btn" style="background: var(--primary); color: white;" disabled>💾 Als PDF speichern</button>
+        </div>
+      </div>
+
+      <div id="trendMessage" class="message-box"></div>
+      <div id="trendLoader" style="text-align:center; padding: 2rem 0; font-size: 1.1rem;">⏳ Lade Trendanalyse...</div>
+
+      <div id="trendContent" style="display:none;">
+        <p style="margin:0 0 1.5rem 0; font-weight:600; color:#374151;">Zeitraum: <span id="trendPeriodLabel">–</span></p>
+
+        <div class="chart-container" style="margin-bottom: 2rem;">
+          <div class="chart-title">Mitarbeiter-Entwicklung (Tickets pro Monat)</div>
+          <div class="chart-wrapper" style="height: 350px;">
+            <canvas id="trendStaffChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-container" style="margin-bottom: 2rem;">
+          <div class="chart-title">Mitarbeiter-Trend</div>
+          <table class="data-table" id="trendStaffTable">
+            <thead><tr>
+              <th class="sortable" id="trendStaffTh0" onclick="sortTrendTable('staff', 0)" title="Sortieren">Mitarbeiter</th>
+              <th class="sortable" id="trendStaffTh1" onclick="sortTrendTable('staff', 1)" title="Sortieren">Verlauf (Tickets)</th>
+              <th class="sortable" id="trendStaffTh2" onclick="sortTrendTable('staff', 2)" title="Sortieren">Ø 1. Hälfte</th>
+              <th class="sortable" id="trendStaffTh3" onclick="sortTrendTable('staff', 3)" title="Sortieren">Ø 2. Hälfte</th>
+              <th class="sortable" id="trendStaffTh4" onclick="sortTrendTable('staff', 4)" title="Sortieren">Trend Tickets</th>
+            </tr></thead>
+            <tbody id="trendStaffTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="chart-container">
+          <div class="chart-title">Standort-Trend</div>
+          <table class="data-table" id="trendLocTable">
+            <thead><tr>
+              <th class="sortable" id="trendLocTh0" onclick="sortTrendTable('loc', 0)" title="Sortieren">Standort</th>
+              <th class="sortable" id="trendLocTh1" onclick="sortTrendTable('loc', 1)" title="Sortieren">Mitarbeiter</th>
+              <th class="sortable" id="trendLocTh2" onclick="sortTrendTable('loc', 2)" title="Sortieren">Verlauf (Tickets)</th>
+              <th class="sortable" id="trendLocTh3" onclick="sortTrendTable('loc', 3)" title="Sortieren">Ø 1. Hälfte</th>
+              <th class="sortable" id="trendLocTh4" onclick="sortTrendTable('loc', 4)" title="Sortieren">Ø 2. Hälfte</th>
+              <th class="sortable" id="trendLocTh5" onclick="sortTrendTable('loc', 5)" title="Sortieren">Trend Tickets</th>
+            </tr></thead>
+            <tbody id="trendLocTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- BERICHT TAB -->
     <div id="bericht-tab" class="tab-content">
       <p>Erstelle einen formatierten PDF-Bericht inkl. Vergleich zur exakten Vorperiode (z.B. Vorwoche, Vormonat).</p>
@@ -302,7 +408,7 @@
             <div class="rep-table-box">
                <h3>Top Standorte (Detail)</h3>
                <table class="rep-table">
-                  <thead><tr><th>#</th><th>Standort</th><th>Tickets Periode</th><th>Netto-Umsatz</th></tr></thead>
+                  <thead><tr><th>#</th><th>Standort</th><th>Mitarbeiter</th><th>Tickets Periode</th><th>Netto-Umsatz</th></tr></thead>
                   <tbody id="repTableBody"></tbody>
                </table>
             </div>
@@ -325,9 +431,27 @@
       
       <button id="submitBtn" onclick="submitData()" style="width: 100%;">🚀 Daten in Zieltabelle eintragen</button>
       <div id="eingabeMessage" class="message-box"></div>
-      <div id="previewContainer" style="display:none;"></div> 
+      <div id="previewContainer" style="display:none;"></div>
     </div>
-    
+
+    <!-- TAGESDATEN TAB -->
+    <div id="tagesdaten-tab" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <p style="margin:0 0 0.75rem 0;">Tageweise Rohdaten pro Standort. Klicke in eine Zelle, um den Wert direkt zu bearbeiten – die Änderung wird sofort gespeichert.</p>
+          <div class="form-group" style="margin-bottom:0; max-width: 220px;">
+            <label>Monat:</label>
+            <input type="month" id="tagesdatenMonat">
+          </div>
+        </div>
+        <button onclick="loadTagesdaten()" class="btn-success filter-btn">🔄 Laden</button>
+      </div>
+
+      <div id="tagesdatenMessage" class="message-box"></div>
+      <div id="tagesdatenLoader" style="text-align:center; padding: 2rem 0; font-size: 1.1rem;">⏳ Lade Tagesdaten...</div>
+      <div id="tagesdatenTableContainer" style="display:none; overflow-x:auto; border: 1px solid var(--border); border-radius: 8px;"></div>
+    </div>
+
     <!-- STANDORTE TAB -->
     <div id="standorte-tab" class="tab-content">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
@@ -369,25 +493,60 @@
     
     let currentLocationsData = []; let currentLocationsSheetName = '';
     let currentRowIndex = null; let sortCol = -1; let sortAsc = true;
+
+    let currentDashLocations = []; let dashSortCol = 3; let dashSortAsc = false;
+
+    let currentTagesdaten = null;
+
+    let currentTrendData = null; let trendChartInstance = null;
+    let trendStaffSortCol = 4; let trendStaffSortAsc = false;
+    let trendLocSortCol = 5; let trendLocSortAsc = false;
+
+    const trendStaffColumns = [
+      { key: 'name', type: 'text' },
+      { key: 'ticketSeries', type: 'series' },
+      { key: 'ticketFirstAvg', type: 'number' },
+      { key: 'ticketSecondAvg', type: 'number' },
+      { key: 'ticketTrendPercent', type: 'trend' }
+    ];
+    const trendLocColumns = [
+      { key: 'name', type: 'text' },
+      { key: 'staff', type: 'text' },
+      { key: 'ticketSeries', type: 'series' },
+      { key: 'ticketFirstAvg', type: 'number' },
+      { key: 'ticketSecondAvg', type: 'number' },
+      { key: 'ticketTrendPercent', type: 'trend' }
+    ];
+    const trendStaffLabels = ['Mitarbeiter', 'Verlauf (Tickets)', 'Ø 1. Hälfte', 'Ø 2. Hälfte', 'Trend Tickets'];
+    const trendLocLabels = ['Standort', 'Mitarbeiter', 'Verlauf (Tickets)', 'Ø 1. Hälfte', 'Ø 2. Hälfte', 'Trend Tickets'];
     
     const eurFormatter = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
     window.onload = function() {
+       const now = new Date();
+       document.getElementById('tagesdatenMonat').value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
        loadDashboard();
     };
 
     function switchTab(tabName) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      
-      const tabMap = {'dashboard': 0, 'bericht': 1, 'eingabe': 2, 'standorte': 3};
+
+      const tabMap = {'dashboard': 0, 'rankings': 1, 'trend': 2, 'bericht': 3, 'eingabe': 4, 'tagesdaten': 5, 'standorte': 6};
       document.querySelectorAll('.tab')[tabMap[tabName]].classList.add('active');
       document.getElementById(tabName + '-tab').classList.add('active');
-      
-      if(tabName === 'dashboard') { 
-          loadDashboard(); 
-      } else if (tabName === 'standorte') { 
-          loadLocationsList(); 
+
+      if(tabName === 'dashboard') {
+          loadDashboard();
+      } else if (tabName === 'rankings') {
+          if(staffChartInstance) staffChartInstance.resize();
+          if(locChartInstance) locChartInstance.resize();
+      } else if (tabName === 'trend') {
+          loadTrend();
+      } else if (tabName === 'tagesdaten') {
+          loadTagesdaten();
+      } else if (tabName === 'standorte') {
+          loadLocationsList();
       } else if (tabName === 'eingabe') {
           if (!mySpreadsheet) {
              mySpreadsheet = jspreadsheet(document.getElementById('spreadsheet'), {
@@ -448,8 +607,65 @@
          return;
       }
 
-      btn.disabled = true; btn.innerText = "⏳ Wird gespeichert...";
+      btn.disabled = true; btn.innerText = "⏳ Prüfe Zuordnung...";
       document.getElementById('previewContainer').style.display = 'none';
+      document.getElementById('previewContainer').innerHTML = '';
+
+      google.script.run.withSuccessHandler(function(preview) {
+          if (!preview.success) {
+            btn.disabled = false; btn.innerText = "🚀 Daten in Zieltabelle eintragen";
+            showMsg('eingabeMessage', preview.message, "error");
+            return;
+          }
+          if (preview.unmatched.length > 0) {
+            btn.disabled = false; btn.innerText = "🚀 Daten in Zieltabelle eintragen";
+            showNewLocationConfirm(datum, parsedData, preview);
+          } else {
+            commitParsedData(datum, parsedData);
+          }
+        }).withFailureHandler(function(error) {
+          btn.disabled = false; btn.innerText = "🚀 Daten in Zieltabelle eintragen";
+          showMsg('eingabeMessage', "Fehler: " + error.message, "error");
+        }).previewPastedData(datum, parsedData);
+    }
+
+    let pendingSubmit = null;
+
+    function showNewLocationConfirm(datum, parsedData, preview) {
+      const rows = preview.unmatched.map(u => `<tr><td>${u.ort || '-'}</td><td>${u.strasse}</td><td>${u.anzahl}</td></tr>`).join('');
+      const html = `
+        <div style="background:#fff7ed; border:2px solid #f59e0b; border-radius:8px; padding:1.5rem;">
+          <h3 style="margin-top:0; color:#b45309;">⚠️ ${preview.unmatched.length} Standort(e) konnten keinem bestehenden Standort zugeordnet werden</h3>
+          <p style="margin-bottom:1rem;">Bitte prüfen: Ist das wirklich neu, oder nur eine abweichende Schreibweise eines bereits vorhandenen Standorts (z.B. andere Abkürzung, Tippfehler, fehlende PLZ)? Im Zweifel lieber abbrechen und die Schreibweise in der Tabelle korrigieren, statt versehentlich einen Duplikat-Standort anzulegen.</p>
+          <div class="grid-preview" style="margin-bottom:1.5rem;">
+            <table class="data-table"><thead><tr><th>Ort</th><th>Straße</th><th>Anzahl</th></tr></thead><tbody>${rows}</tbody></table>
+          </div>
+          <button onclick="confirmNewLocations()" class="btn-success">✅ Ja, als neue Standorte anlegen</button>
+          <button onclick="cancelNewLocations()" class="btn-secondary" style="margin-left:0.5rem;">✖ Abbrechen</button>
+        </div>`;
+      document.getElementById('previewContainer').style.display = 'block';
+      document.getElementById('previewContainer').innerHTML = html;
+      pendingSubmit = { datum: datum, parsedData: parsedData };
+    }
+
+    function confirmNewLocations() {
+      if (!pendingSubmit) return;
+      document.getElementById('previewContainer').style.display = 'none';
+      document.getElementById('previewContainer').innerHTML = '';
+      commitParsedData(pendingSubmit.datum, pendingSubmit.parsedData);
+      pendingSubmit = null;
+    }
+
+    function cancelNewLocations() {
+      document.getElementById('previewContainer').style.display = 'none';
+      document.getElementById('previewContainer').innerHTML = '';
+      pendingSubmit = null;
+      showMsg('eingabeMessage', 'Abgebrochen. Es wurde nichts gespeichert. Bitte die Schreibweise prüfen und erneut versuchen.', 'error');
+    }
+
+    function commitParsedData(datum, parsedData) {
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true; btn.innerText = "⏳ Wird gespeichert...";
 
       google.script.run.withSuccessHandler(function(response) {
           if(response.success) {
@@ -459,12 +675,12 @@
             }
             showMsg('eingabeMessage', response.message, "success");
             mySpreadsheet.setData([['','',''],['','',''],['','','']]);
-            
+
             // NEU: Datum automatisch +1 Tag nach erfolgreichem Upload!
             let currentDatum = new Date(datum);
             currentDatum.setDate(currentDatum.getDate() + 1);
             document.getElementById('datum').valueAsDate = currentDatum;
-            
+
             btn.disabled = false;
             btn.innerText = "🚀 Daten in Zieltabelle eintragen";
           } else {
@@ -474,7 +690,7 @@
         }).withFailureHandler(function(error) {
           btn.disabled = false; btn.innerText = "🚀 Daten in Zieltabelle eintragen";
           showMsg('eingabeMessage', "Fehler: " + error.message, "error");
-        }).processPastedData(datum, parsedData); 
+        }).commitPastedData(datum, parsedData);
     }
 
     function calcDatesForType(type) {
@@ -532,16 +748,17 @@
       const baseDatum = document.getElementById('datum').value; 
       google.script.run.withSuccessHandler(function(response) {
           document.getElementById('loadingDash').style.display = 'none';
-          if(response.success) { 
+          if(response.success) {
               document.getElementById('dashKpiTotal').innerText = response.currentTotal || 0;
               document.getElementById('dashKpiRevenue').innerText = eurFormatter.format(response.totalRevenue || 0);
-              renderDashCharts(response); 
+              document.getElementById('rankingsPeriodLabel').innerText = response.sheetName || '–';
+              renderDashCharts(response);
           } else { alert("Fehler: " + response.message); }
         }).withFailureHandler(function(error) {
           document.getElementById('loadingDash').style.display = 'none'; alert("Fehler: " + error.message);
         }).getDashboardStats(start, end, baseDatum);
     }
-    
+
     function renderDashCharts(data) {
       const staffLabels = data.staff.map(s => s.name); const staffValues = data.staff.map(s => s.count);
       document.getElementById('staffChartWrapper').style.height = Math.max(300, staffLabels.length * 35 + 80) + 'px';
@@ -558,6 +775,39 @@
         type: 'bar', data: { labels: locLabels, datasets: [{ label: 'Tickets', data: locValues, backgroundColor: '#003366', borderRadius: 6, maxBarThickness: 30 }] },
         options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
       });
+
+      currentDashLocations = data.locations.slice();
+      renderDashLocTable();
+    }
+
+    function sortDashLocTable(col) {
+      if (dashSortCol === col) { dashSortAsc = !dashSortAsc; } else { dashSortCol = col; dashSortAsc = (col !== 3 && col !== 4); }
+      renderDashLocTable();
+    }
+
+    function renderDashLocTable() {
+      currentDashLocations.sort((a, b) => {
+        let valA, valB;
+        if (dashSortCol === 0) { valA = a.name.toLowerCase(); valB = b.name.toLowerCase(); }
+        else if (dashSortCol === 1) { valA = (a.address || '').toLowerCase(); valB = (b.address || '').toLowerCase(); }
+        else if (dashSortCol === 2) { valA = (a.staff || '').toLowerCase(); valB = (b.staff || '').toLowerCase(); }
+        else if (dashSortCol === 3) { valA = a.count; valB = b.count; }
+        else { valA = a.revenue; valB = b.revenue; }
+        if (valA < valB) return dashSortAsc ? -1 : 1;
+        if (valA > valB) return dashSortAsc ? 1 : -1;
+        return 0;
+      });
+
+      let html = '';
+      currentDashLocations.forEach(l => {
+        html += `<tr><td>${l.name}</td><td>${l.address || '-'}</td><td>${l.staff || 'Ohne Zuweisung'}</td><td>${l.count}</td><td>${eurFormatter.format(l.revenue || 0)}</td></tr>`;
+      });
+      document.getElementById('dashLocTableBody').innerHTML = html || '<tr><td colspan="5" style="text-align:center; color:#6b7280;">Keine Daten im gewählten Zeitraum.</td></tr>';
+
+      const labels = ['Standort', 'Adresse', 'Mitarbeiter', 'Tickets', 'Umsatz'];
+      for (let i = 0; i < 5; i++) {
+        document.getElementById('dashTh' + i).innerText = labels[i] + (dashSortCol === i ? (dashSortAsc ? ' 🔼' : ' 🔽') : '');
+      }
     }
 
     function setRepFilter(type) {
@@ -604,7 +854,7 @@
 
       let tBody = "";
       for(let i=0; i < Math.min(10, data.topLocs.length); i++) {
-         tBody += `<tr><td>${i+1}</td><td>${data.topLocs[i].name}</td><td><strong>${data.topLocs[i].count}</strong></td><td>${eurFormatter.format(data.topLocs[i].revenue || 0)}</td></tr>`;
+         tBody += `<tr><td>${i+1}</td><td>${data.topLocs[i].name}</td><td>${data.topLocs[i].staff || 'Ohne Zuweisung'}</td><td><strong>${data.topLocs[i].count}</strong></td><td>${eurFormatter.format(data.topLocs[i].revenue || 0)}</td></tr>`;
       }
       document.getElementById('repTableBody').innerHTML = tBody;
 
@@ -643,6 +893,281 @@
       btn.innerText = "⏳ Erstelle PDF...";
       html2pdf().set(opt).from(element).save().then(() => {
           btn.innerText = "💾 PDF Speichern";
+      });
+    }
+
+    function loadTagesdaten() {
+      const monthVal = document.getElementById('tagesdatenMonat').value;
+      if (!monthVal) { showMsg('tagesdatenMessage', 'Bitte einen Monat auswählen.', 'error'); return; }
+
+      document.getElementById('tagesdatenLoader').style.display = 'block';
+      document.getElementById('tagesdatenTableContainer').style.display = 'none';
+
+      google.script.run.withSuccessHandler(function(response) {
+          document.getElementById('tagesdatenLoader').style.display = 'none';
+          if (response.success) {
+            currentTagesdaten = response;
+            renderTagesdatenTable();
+            document.getElementById('tagesdatenTableContainer').style.display = 'block';
+            if (!response.sheetExists) {
+              showMsg('tagesdatenMessage', `Für ${response.sheetName} existiert noch kein Tabellenblatt.`, 'error');
+            }
+          } else {
+            showMsg('tagesdatenMessage', response.message, 'error');
+          }
+        }).withFailureHandler(function(error) {
+          document.getElementById('tagesdatenLoader').style.display = 'none';
+          showMsg('tagesdatenMessage', 'Fehler: ' + error.message, 'error');
+        }).getDailyData(monthVal);
+    }
+
+    function renderTagesdatenTable() {
+      const data = currentTagesdaten;
+      const container = document.getElementById('tagesdatenTableContainer');
+      if (!data || !data.rows || data.rows.length === 0) {
+        container.innerHTML = '<p style="padding:1rem; margin:0; color:#6b7280;">Keine Standorte für diesen Monat gefunden.</p>';
+        return;
+      }
+
+      let html = '<table class="daily-table"><thead><tr>';
+      html += '<th class="daily-loc-th daily-loc-col-1">Standort</th>';
+      html += '<th class="daily-loc-th daily-loc-col-2">Mitarbeiter</th>';
+      for (let d = 1; d <= data.daysInMonth; d++) { html += `<th>${d}</th>`; }
+      html += '<th>Summe</th></tr></thead><tbody>';
+
+      data.rows.forEach((row, arrIdx) => {
+        let sum = 0;
+        row.days.forEach(v => { const n = parseInt(v, 10); if (!isNaN(n)) sum += n; });
+
+        const locLabel = row.standort + (row.stadt ? ' (' + row.stadt + ')' : '');
+        const addressLabel = (row.strasse + ' ' + row.hausnummer).trim();
+        const staffLabel = row.staff || 'Ohne Zuweisung';
+        html += `<tr><td class="daily-loc-cell daily-loc-col-1" title="${locLabel}${addressLabel ? ' – ' + addressLabel : ''}">`;
+        html += `<div class="daily-loc-name"><strong>${locLabel}</strong></div>`;
+        html += `<div class="daily-loc-address">${addressLabel || '-'}</div>`;
+        html += `</td>`;
+        html += `<td class="daily-loc-cell daily-loc-col-2" title="${staffLabel}">${staffLabel}</td>`;
+        row.days.forEach((v, dIdx) => {
+          const day = dIdx + 1;
+          html += `<td><input type="text" inputmode="numeric" class="daily-input" value="${v === '' ? '' : v}" data-row="${row.rowIndex}" data-day="${day}" data-arridx="${arrIdx}" onchange="saveDailyValue(this)"></td>`;
+        });
+        html += `<td class="daily-total-cell" id="dailySum-${row.rowIndex}">${sum}</td></tr>`;
+      });
+      html += '</tbody></table>';
+
+      container.innerHTML = html;
+    }
+
+    function saveDailyValue(inputEl) {
+      const rowIndex = inputEl.dataset.row;
+      const day = parseInt(inputEl.dataset.day, 10);
+      const arrIdx = parseInt(inputEl.dataset.arridx, 10);
+      const value = inputEl.value.trim();
+      inputEl.classList.remove('saved', 'error');
+
+      google.script.run.withSuccessHandler(function(res) {
+          if (res.success) {
+            inputEl.classList.add('saved');
+            setTimeout(() => inputEl.classList.remove('saved'), 1500);
+
+            currentTagesdaten.rows[arrIdx].days[day - 1] = value;
+            let sum = 0;
+            currentTagesdaten.rows[arrIdx].days.forEach(v => { const n = parseInt(v, 10); if (!isNaN(n)) sum += n; });
+            const sumCell = document.getElementById('dailySum-' + rowIndex);
+            if (sumCell) sumCell.innerText = sum;
+          } else {
+            inputEl.classList.add('error');
+            showMsg('tagesdatenMessage', res.message, 'error');
+          }
+        }).withFailureHandler(function(error) {
+          inputEl.classList.add('error');
+          showMsg('tagesdatenMessage', 'Fehler: ' + error.message, 'error');
+        }).updateDailyValue({ sheetName: currentTagesdaten.sheetName, rowIndex: rowIndex, day: day, value: value });
+    }
+
+    function loadTrend() {
+      const months = document.getElementById('trendMonths').value;
+
+      document.getElementById('trendLoader').style.display = 'block';
+      document.getElementById('trendContent').style.display = 'none';
+      document.getElementById('trendPdfBtn').disabled = true;
+
+      google.script.run.withSuccessHandler(function(response) {
+          document.getElementById('trendLoader').style.display = 'none';
+          if (response.success) {
+            currentTrendData = response;
+            document.getElementById('trendPeriodLabel').innerText = response.months[0] + ' – ' + response.months[response.months.length - 1];
+            renderTrendChart();
+            renderTrendTable('staff');
+            renderTrendTable('loc');
+            document.getElementById('trendContent').style.display = 'block';
+            document.getElementById('trendPdfBtn').disabled = false;
+          } else {
+            showMsg('trendMessage', response.message, 'error');
+          }
+        }).withFailureHandler(function(error) {
+          document.getElementById('trendLoader').style.display = 'none';
+          showMsg('trendMessage', 'Fehler: ' + error.message, 'error');
+        }).getTrendData(months);
+    }
+
+    function renderTrendChart() {
+      const data = currentTrendData;
+      const palette = ['#003366', '#00a651', '#ea580c', '#7c3aed', '#dc2626', '#0891b2', '#ca8a04', '#4b5563', '#db2777', '#059669'];
+
+      const datasets = data.staff.map((s, idx) => ({
+        label: s.name,
+        data: s.ticketSeries,
+        borderColor: palette[idx % palette.length],
+        backgroundColor: palette[idx % palette.length],
+        tension: 0.3,
+        fill: false
+      }));
+
+      if (trendChartInstance) trendChartInstance.destroy();
+      trendChartInstance = new Chart(document.getElementById('trendStaffChart').getContext('2d'), {
+        type: 'line',
+        data: { labels: data.months, datasets: datasets },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+      });
+    }
+
+    function formatTrendPercent(p) {
+      if (p === null || p === undefined) return '-';
+      const rounded = Math.round(p * 10) / 10;
+      const sign = rounded > 0 ? '+' : '';
+      let color = '#6b7280';
+      if (rounded > 5) color = '#059669';
+      else if (rounded < -5) color = '#dc2626';
+      return `<span style="color:${color}; font-weight:700;">${sign}${rounded.toFixed(1)}%</span>`;
+    }
+
+    function sortTrendTable(type, col) {
+      if (type === 'staff') {
+        if (trendStaffSortCol === col) { trendStaffSortAsc = !trendStaffSortAsc; } else { trendStaffSortCol = col; trendStaffSortAsc = (col === 0); }
+      } else {
+        if (trendLocSortCol === col) { trendLocSortAsc = !trendLocSortAsc; } else { trendLocSortCol = col; trendLocSortAsc = (col === 0 || col === 1); }
+      }
+      renderTrendTable(type);
+    }
+
+    function renderTrendTable(type) {
+      const isStaff = (type === 'staff');
+      const rows = (isStaff ? currentTrendData.staff : currentTrendData.locations).slice();
+      const columns = isStaff ? trendStaffColumns : trendLocColumns;
+      const labels = isStaff ? trendStaffLabels : trendLocLabels;
+      const sortCol = isStaff ? trendStaffSortCol : trendLocSortCol;
+      const sortAsc = isStaff ? trendStaffSortAsc : trendLocSortAsc;
+      const thPrefix = isStaff ? 'trendStaffTh' : 'trendLocTh';
+      const bodyId = isStaff ? 'trendStaffTableBody' : 'trendLocTableBody';
+
+      const sortColDef = columns[sortCol];
+      rows.sort((a, b) => {
+        let valA = a[sortColDef.key], valB = b[sortColDef.key];
+        if (sortColDef.type === 'series') { valA = a.ticketFirstAvg + a.ticketSecondAvg; valB = b.ticketFirstAvg + b.ticketSecondAvg; }
+        else if (sortColDef.type === 'text') { valA = (valA || '').toLowerCase(); valB = (valB || '').toLowerCase(); }
+        else if (sortColDef.type === 'trend') { valA = (valA === null || valA === undefined) ? -Infinity : valA; valB = (valB === null || valB === undefined) ? -Infinity : valB; }
+        if (valA < valB) return sortAsc ? -1 : 1;
+        if (valA > valB) return sortAsc ? 1 : -1;
+        return 0;
+      });
+
+      let html = '';
+      rows.forEach(r => {
+        html += '<tr>';
+        columns.forEach(c => {
+          const val = r[c.key];
+          if (c.type === 'series') html += `<td style="font-size:0.85rem; color:#6b7280; white-space:nowrap;">${r.ticketSeries.join(', ')}</td>`;
+          else if (c.type === 'number') html += `<td>${val != null ? val.toFixed(1) : '-'}</td>`;
+          else if (c.type === 'trend') html += `<td>${formatTrendPercent(val)}</td>`;
+          else html += `<td>${val || (c.key === 'staff' ? 'Ohne Zuweisung' : '-')}</td>`;
+        });
+        html += '</tr>';
+      });
+      document.getElementById(bodyId).innerHTML = html || `<tr><td colspan="${columns.length}" style="text-align:center; color:#6b7280;">Keine Daten.</td></tr>`;
+
+      labels.forEach((label, i) => {
+        document.getElementById(thPrefix + i).innerText = label + (sortCol === i ? (sortAsc ? ' 🔼' : ' 🔽') : '');
+      });
+    }
+
+    function downloadTrendPDF() {
+      if (!currentTrendData) return;
+
+      const btn = document.getElementById('trendPdfBtn');
+      btn.disabled = true;
+      const originalLabel = btn.innerText;
+      btn.innerText = '⏳ Erstelle PDF...';
+
+      const periodLabel = currentTrendData.months[0] + ' – ' + currentTrendData.months[currentTrendData.months.length - 1];
+      const chartImg = trendChartInstance ? trendChartInstance.toBase64Image() : '';
+
+      const sortByTrendDesc = (a, b) => {
+        const va = (a.ticketTrendPercent === null || a.ticketTrendPercent === undefined) ? -Infinity : a.ticketTrendPercent;
+        const vb = (b.ticketTrendPercent === null || b.ticketTrendPercent === undefined) ? -Infinity : b.ticketTrendPercent;
+        return vb - va;
+      };
+
+      const staffRows = currentTrendData.staff.slice().sort(sortByTrendDesc)
+        .map(s => `<tr><td>${s.name}</td><td>${s.ticketSeries.join(', ')}</td><td>${s.ticketFirstAvg.toFixed(1)}</td><td>${s.ticketSecondAvg.toFixed(1)}</td><td>${formatTrendPercent(s.ticketTrendPercent)}</td></tr>`)
+        .join('');
+
+      const locRows = currentTrendData.locations.slice().sort(sortByTrendDesc)
+        .map(l => `<tr><td>${l.name}</td><td>${l.staff || 'Ohne Zuweisung'}</td><td>${l.ticketSeries.join(', ')}</td><td>${l.ticketFirstAvg.toFixed(1)}</td><td>${l.ticketSecondAvg.toFixed(1)}</td><td>${formatTrendPercent(l.ticketTrendPercent)}</td></tr>`)
+        .join('');
+
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.innerHTML = `
+        <div class="report-page">
+          <div class="rep-header">
+            <img src="https://parkinnovation.de/wp-content/uploads/2023/11/PI-Logo_220.png" alt="Logo">
+            <div class="rep-title">
+              <h1>Trendanalyse</h1>
+              <p>${periodLabel}</p>
+            </div>
+          </div>
+          ${chartImg ? `<div class="rep-chart-box" style="margin-bottom: 20px;">
+            <h4 style="text-align:center; margin-top:0; color:#374151;">Mitarbeiter-Entwicklung (Tickets pro Monat)</h4>
+            <img src="${chartImg}" style="width:100%;">
+          </div>` : ''}
+          <div class="rep-table-box">
+            <h3>Mitarbeiter-Trend</h3>
+            <table class="rep-table">
+              <thead><tr><th>Mitarbeiter</th><th>Verlauf (Tickets)</th><th>Ø 1. Hälfte</th><th>Ø 2. Hälfte</th><th>Trend</th></tr></thead>
+              <tbody>${staffRows}</tbody>
+            </table>
+          </div>
+          <div class="rep-table-box" style="margin-top: 24px;">
+            <h3>Standort-Trend</h3>
+            <table class="rep-table">
+              <thead><tr><th>Standort</th><th>Mitarbeiter</th><th>Verlauf (Tickets)</th><th>Ø 1. Hälfte</th><th>Ø 2. Hälfte</th><th>Trend</th></tr></thead>
+              <tbody>${locRows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(container);
+
+      const opt = {
+        margin: 0,
+        filename: `PCN_Trendanalyse_${periodLabel.replace(/\s/g, '').replace(/–/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(container.querySelector('.report-page')).save().then(() => {
+        document.body.removeChild(container);
+        btn.disabled = false;
+        btn.innerText = originalLabel;
+      }).catch(() => {
+        document.body.removeChild(container);
+        btn.disabled = false;
+        btn.innerText = originalLabel;
+        showMsg('trendMessage', 'PDF konnte nicht erstellt werden.', 'error');
       });
     }
 
